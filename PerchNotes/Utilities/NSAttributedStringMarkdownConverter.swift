@@ -202,18 +202,29 @@ class NSAttributedStringMarkdownConverter {
 
             var formatted = substring
 
-            // Check for font styling
-            if let font = attributes[.font] as? NSFont {
+            // Check for explicit heading level attribute first
+            if let headingLevel = attributes[NSAttributedString.Key("HeadingLevel")] as? NSNumber {
+                let level = headingLevel.intValue
+                switch level {
+                case 1: formatted = "# " + formatted
+                case 2: formatted = "## " + formatted
+                case 3: formatted = "### " + formatted
+                default: break
+                }
+            } else if let font = attributes[.font] as? NSFont {
+                // Fall back to font size detection for headings
                 let fontSize = font.pointSize
                 let traits = NSFontManager.shared.traits(of: font)
 
-                // Headers (based on font size)
-                if fontSize >= 24 {
+                // Headers (based on font size - baseFont is typically 14pt)
+                if fontSize >= 24 {  // H1 (28pt with 14pt base)
                     formatted = "# " + formatted
-                } else if fontSize >= 20 {
-                    formatted = "## " + formatted
-                } else if fontSize >= 17 {
-                    formatted = "### " + formatted
+                } else if fontSize >= 18 && fontSize < 24 {  // H2 (21pt) or H3 (18pt)
+                    if fontSize >= 20 {
+                        formatted = "## " + formatted
+                    } else {
+                        formatted = "### " + formatted
+                    }
                 } else {
                     // Bold
                     if traits.contains(.boldFontMask) {

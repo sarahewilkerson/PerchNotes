@@ -162,9 +162,13 @@ class MenuBarManager: NSObject, ObservableObject {
         guard let window = popover?.contentViewController?.view.window else { return }
 
         if floatOnTop {
+            // Change popover behavior to prevent auto-close when clicking outside
+            popover?.behavior = .applicationDefined
             window.level = .floating
             window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         } else {
+            // Restore transient behavior (auto-close when clicking outside)
+            popover?.behavior = .transient
             window.level = .normal
             window.collectionBehavior = []
         }

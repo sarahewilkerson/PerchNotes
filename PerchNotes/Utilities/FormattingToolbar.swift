@@ -190,38 +190,36 @@ class RichTextFormattingHandler: ObservableObject {
     private func applyHeading(to textView: NSTextView, level: Int) {
         guard let textStorage = textView.textStorage else { return }
         let range = textView.selectedRange()
-        let baseFont = textView.font ?? NSFont.systemFont(ofSize: 14)
 
-        // Use base font size with bold for all headings to maintain font consistency
-        let font = NSFont.systemFont(ofSize: baseFont.pointSize, weight: .bold)
+        // Always use consistent base font size for calculations
+        let baseFontSize: CGFloat = 14
 
-        // Insert markdown heading prefix
-        let prefix: String
+        // Calculate heading font size based on level (absolute sizes)
+        let fontSize: CGFloat
         switch level {
-        case 1: prefix = "# "
-        case 2: prefix = "## "
-        case 3: prefix = "### "
-        default: prefix = ""
+        case 1: fontSize = baseFontSize * 2.0      // H1: 28pt
+        case 2: fontSize = baseFontSize * 1.5      // H2: 21pt
+        case 3: fontSize = baseFontSize * 1.3      // H3: 18pt
+        default: fontSize = baseFontSize
         }
 
+        // Create bold font with appropriate size
+        let font = NSFont.systemFont(ofSize: fontSize, weight: .bold)
+
+        // Store heading level as custom attribute for markdown conversion
+        let headingLevel = NSNumber(value: level)
+
         if range.length > 0 {
-            // Apply bold to selection
+            // Apply heading style to selection
             textStorage.addAttribute(.font, value: font, range: range)
             textStorage.addAttribute(.foregroundColor, value: NSColor.textColor, range: range)
+            textStorage.addAttribute(NSAttributedString.Key("HeadingLevel"), value: headingLevel, range: range)
         } else {
-            // Insert heading prefix at current cursor position
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: font,
-                .foregroundColor: NSColor.textColor
-            ]
-            let headingPrefix = NSAttributedString(string: prefix, attributes: attrs)
-            textStorage.insert(headingPrefix, at: range.location)
-            textView.setSelectedRange(NSRange(location: range.location + prefix.count, length: 0))
-
-            // Set typing attributes to bold
+            // Set typing attributes for heading
             var typingAttrs = textView.typingAttributes
             typingAttrs[.font] = font
             typingAttrs[.foregroundColor] = NSColor.textColor
+            typingAttrs[NSAttributedString.Key("HeadingLevel")] = headingLevel
             textView.typingAttributes = typingAttrs
         }
     }
