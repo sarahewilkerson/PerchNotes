@@ -4,6 +4,7 @@ import AppKit
 class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     private var onboardingWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
+    private var hasAnimatedOnboarding = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Enable menu bar on launch
@@ -18,13 +19,33 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Observe onboarding manager changes
         setupOnboardingObserver()
+
+        // Observe menu bar popover visibility
+        setupPopoverObserver()
     }
 
     private func setupOnboardingObserver() {
         OnboardingManager.shared.$shouldShowOnboarding
+            .receive(on: DispatchQueue.main)
             .sink { [weak self] shouldShow in
                 if shouldShow {
-                    self?.showOnboardingWindow()
+                    Task { @MainActor in
+                        self?.showOnboardingWindow()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    @MainActor
+    private func setupPopoverObserver() {
+        MenuBarManager.shared.$isPopoverVisible
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isVisible in
+                if isVisible && !self!.hasAnimatedOnboarding {
+                    Task { @MainActor in
+                        self?.animateOnboardingToSide()
+                    }
                 }
             }
             .store(in: &cancellables)
@@ -43,6 +64,7 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
                 OnboardingManager.shared.markOnboardingComplete()
                 self?.onboardingWindow?.close()
                 self?.onboardingWindow = nil
+                self?.hasAnimatedOnboarding = false
             }
         )
         let hostingController = NSHostingController(rootView: onboardingView)
@@ -50,12 +72,45 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         let window = NSWindow(contentViewController: hostingController)
         window.title = "Welcome to PerchNotes"
         window.styleMask = [.titled, .closable]
-        window.center()
         window.isReleasedWhenClosed = false
+
+        // Start centered
+        window.setContentSize(NSSize(width: 580, height: 720))
+        window.center()
 
         onboardingWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    @MainActor
+    private func animateOnboardingToSide() {
+        guard let window = onboardingWindow, !hasAnimatedOnboarding else { return }
+        guard let screen = NSScreen.main else { return }
+
+        hasAnimatedOnboarding = true
+
+        // Auto-pin the notepad now that it's actually open (with a small delay to ensure window is ready)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            MenuBarManager.shared.setFloatOnTop(true)
+        }
+
+        let screenFrame = screen.visibleFrame
+        let windowWidth: CGFloat = 580
+        let windowHeight: CGFloat = 720
+
+        // Position in the left third of the screen
+        let xPos = screenFrame.origin.x + (screenFrame.width * 0.25) - (windowWidth / 2)
+        let yPos = screenFrame.origin.y + (screenFrame.height - windowHeight) / 2
+
+        let newFrame = NSRect(x: xPos, y: yPos, width: windowWidth, height: windowHeight)
+
+        // Animate the move
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.5
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(newFrame, display: true)
+        })
     }
 }
 

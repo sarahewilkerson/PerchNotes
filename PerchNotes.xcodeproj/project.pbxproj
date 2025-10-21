@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		6D6F69162EA6EA7C00108651 /* OnboardingWalkthroughView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F69152EA6EA7C00108651 /* OnboardingWalkthroughView.swift */; };
+		6D6F69182EA6EA8E00108651 /* OnboardingManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F69172EA6EA8E00108651 /* OnboardingManager.swift */; };
+		6D6F691A2EA6EA9E00108651 /* PerchNotesAppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F69192EA6EA9E00108651 /* PerchNotesAppDelegate.swift */; };
+		6D6F691C2EA6EDA500108651 /* PreferencesSectionView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F691B2EA6EDA500108651 /* PreferencesSectionView.swift */; };
+		6D6F691E2EA6EDAE00108651 /* AppPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D6F691D2EA6EDAE00108651 /* AppPreferences.swift */; };
 		AA0000010000000000000001 /* PerchNotesApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000011 /* PerchNotesApp.swift */; };
 		AA0000010000000000000002 /* Note.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000012 /* Note.swift */; };
 		AA0000010000000000000003 /* Category.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000010000000000000013 /* Category.swift */; };
@@ -23,6 +28,11 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		6D6F69152EA6EA7C00108651 /* OnboardingWalkthroughView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingWalkthroughView.swift; sourceTree = "<group>"; };
+		6D6F69172EA6EA8E00108651 /* OnboardingManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingManager.swift; sourceTree = "<group>"; };
+		6D6F69192EA6EA9E00108651 /* PerchNotesAppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerchNotesAppDelegate.swift; sourceTree = "<group>"; };
+		6D6F691B2EA6EDA500108651 /* PreferencesSectionView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PreferencesSectionView.swift; sourceTree = "<group>"; };
+		6D6F691D2EA6EDAE00108651 /* AppPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppPreferences.swift; sourceTree = "<group>"; };
 		AA0000010000000000000000 /* PerchNotes.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PerchNotes.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0000010000000000000011 /* PerchNotesApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerchNotesApp.swift; sourceTree = "<group>"; };
 		AA0000010000000000000012 /* Note.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Note.swift; sourceTree = "<group>"; };
@@ -63,6 +73,7 @@
 		AA0000010000000000000031 /* PerchNotes */ = {
 			isa = PBXGroup;
 			children = (
+				6D6F69192EA6EA9E00108651 /* PerchNotesAppDelegate.swift */,
 				AA0000010000000000000011 /* PerchNotesApp.swift */,
 				AA0000010000000000000040 /* Models */,
 				AA0000010000000000000041 /* Views */,
@@ -96,6 +107,8 @@
 		AA0000010000000000000041 /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				6D6F691B2EA6EDA500108651 /* PreferencesSectionView.swift */,
+				6D6F69152EA6EA7C00108651 /* OnboardingWalkthroughView.swift */,
 				AA0000010000000000000014 /* PerchNotesView.swift */,
 				AA0000010000000000000015 /* RichTextEditor.swift */,
 				AA000001000000000000001F /* NotesLibraryView.swift */,
@@ -115,6 +128,8 @@
 		AA0000010000000000000043 /* Utilities */ = {
 			isa = PBXGroup;
 			children = (
+				6D6F691D2EA6EDAE00108651 /* AppPreferences.swift */,
+				6D6F69172EA6EA8E00108651 /* OnboardingManager.swift */,
 				AA0000010000000000000018 /* CustomColors.swift */,
 				AA0000010000000000000019 /* FormattingToolbar.swift */,
 				AA000001000000000000001A /* NSAttributedStringMarkdownConverter.swift */,
@@ -193,11 +208,16 @@
 			files = (
 				AA0000010000000000000001 /* PerchNotesApp.swift in Sources */,
 				AA0000010000000000000002 /* Note.swift in Sources */,
+				6D6F69182EA6EA8E00108651 /* OnboardingManager.swift in Sources */,
 				AA0000010000000000000003 /* Category.swift in Sources */,
 				AA0000010000000000000004 /* PerchNotesView.swift in Sources */,
+				6D6F691E2EA6EDAE00108651 /* AppPreferences.swift in Sources */,
 				AA0000010000000000000005 /* RichTextEditor.swift in Sources */,
 				AA0000010000000000000006 /* MenuBarManager.swift in Sources */,
+				6D6F69162EA6EA7C00108651 /* OnboardingWalkthroughView.swift in Sources */,
 				AA0000010000000000000007 /* NoteManager.swift in Sources */,
+				6D6F691C2EA6EDA500108651 /* PreferencesSectionView.swift in Sources */,
+				6D6F691A2EA6EA9E00108651 /* PerchNotesAppDelegate.swift in Sources */,
 				AA0000010000000000000008 /* CustomColors.swift in Sources */,
 				AA0000010000000000000009 /* FormattingToolbar.swift in Sources */,
 				AA000001000000000000000A /* NSAttributedStringMarkdownConverter.swift in Sources */,

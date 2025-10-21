@@ -122,13 +122,62 @@ private struct RichTextEditorInternal: NSViewRepresentable {
 
         func textDidChange(_ notification: Notification) {
             guard let textView = notification.object as? NSTextView else { return }
+            guard let textStorage = textView.textStorage else { return }
 
             let newAttributedString = textView.attributedString()
 
-            // Always update binding to ensure SwiftUI refreshes
-            // NSAttributedString comparison can be unreliable
-            parent.attributedText = newAttributedString
-            parent.onTextChange?(newAttributedString)
+            // Debug: Check fonts in the text view after change
+            let fonts = getFontsInAttributedString(newAttributedString)
+            if !fonts.isEmpty {
+                print("🔍 TEXT CHANGE: Fonts now in document:", fonts)
+            }
+
+            // Check if any non-base fonts exist (detect Monaco, Menlo, Times, etc.)
+            let baseFontName = parent.font.fontName
+            let baseFontFamily = parent.font.familyName ?? ""
+            print("🔍 TEXT CHANGE: Base font is:", baseFontName, "family:", baseFontFamily)
+
+            let hasNonBaseFonts = fonts.contains { fontString in
+                // Allow base font and its variants (bold/italic)
+                let fontName = fontString.components(separatedBy: " ").first ?? ""
+                let isBaseFont = fontName.hasPrefix(baseFontFamily) ||
+                                fontName == baseFontName ||
+                                fontString.hasPrefix(baseFontName)
+                return !isBaseFont
+            }
+
+            if hasNonBaseFonts {
+                print("🔍 TEXT CHANGE: Non-base fonts detected - normalizing...")
+
+                // Normalize all fonts to base font
+                let normalized = normalizeToBaseFontOnly(newAttributedString)
+
+                // Update the text storage
+                let currentSelection = textView.selectedRange()
+                textStorage.beginEditing()
+                textStorage.setAttributedString(normalized)
+                textStorage.endEditing()
+
+                // Restore selection
+                textView.setSelectedRange(currentSelection)
+
+                // Reset typing attributes
+                textView.typingAttributes = [
+                    .font: parent.font,
+                    .foregroundColor: NSColor.textColor
+                ]
+
+                print("🔍 TEXT CHANGE: Normalization complete - fonts now:", getFontsInAttributedString(textView.attributedString()))
+
+                // Update binding with normalized text
+                parent.attributedText = textView.attributedString()
+                parent.onTextChange?(textView.attributedString())
+            } else {
+                // Always update binding to ensure SwiftUI refreshes
+                // NSAttributedString comparison can be unreliable
+                parent.attributedText = newAttributedString
+                parent.onTextChange?(newAttributedString)
+            }
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -164,7 +213,10 @@ private struct RichTextEditorInternal: NSViewRepresentable {
 
         // Handle paste operations and smart list continuation
         func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            print("🔍 COMMAND: doCommandBy called with selector:", commandSelector)
+
             if commandSelector == #selector(NSTextView.paste(_:)) {
+                print("🔍 COMMAND: Paste command detected - calling handlePaste")
                 return handlePaste(textView)
             }
 
@@ -178,6 +230,7 @@ private struct RichTextEditorInternal: NSViewRepresentable {
                 return handleBackspaceInList(textView)
             }
 
+            print("🔍 COMMAND: Unhandled selector - using default behavior")
             return false
         }
 
@@ -268,44 +321,142 @@ private struct RichTextEditorInternal: NSViewRepresentable {
         }
 
         private func handlePaste(_ textView: NSTextView) -> Bool {
+            print("🔍 PASTE: handlePaste called")
+
             let pasteboard = NSPasteboard.general
             let currentRange = textView.selectedRange()
 
-            // Try to get markdown first
-            if let pastedString = pasteboard.string(forType: .string) {
-                // Check if it looks like markdown
-                let normalized: NSAttributedString
+            guard let textStorage = textView.textStorage else {
+                print("🔍 PASTE: No textStorage available")
+                return false
+            }
 
-                if containsMarkdownSyntax(pastedString) {
-                    // Convert markdown to attributed string
-                    let attributedString = NSAttributedStringMarkdownConverter.convertFromMarkdown(
-                        pastedString,
-                        baseFontSize: parent.font.pointSize
-                    )
+            // Debug: Check all available pasteboard types
+            print("🔍 PASTE: Available types:", pasteboard.types ?? [])
 
-                    // Normalize to ensure consistent font
-                    normalized = normalizeFormatting(attributedString)
-                } else {
-                    // Plain text or rich text - strip everything except bold/italic
-                    normalized = createNormalizedAttributedString(pastedString)
-                }
+            // Get the plain text string (always available, no font info)
+            guard let pastedString = pasteboard.string(forType: .string) else {
+                print("🔍 PASTE: No string data on pasteboard")
+                return false
+            }
 
-                // Use shouldChangeText to ensure proper notifications
-                if textView.shouldChangeText(in: currentRange, replacementString: nil) {
-                    textView.textStorage?.replaceCharacters(in: currentRange, with: normalized)
+            print("🔍 PASTE: Pasted text length:", pastedString.count)
+            print("🔍 PASTE: First 100 chars:", String(pastedString.prefix(100)))
 
-                    // Update selection before didChangeText
-                    let newLocation = currentRange.location + normalized.length
-                    textView.setSelectedRange(NSRange(location: newLocation, length: 0))
+            var normalized: NSAttributedString
 
-                    // Trigger change notification - this will update bindings via textDidChange
-                    textView.didChangeText()
+            // Check if it looks like markdown
+            let hasMarkdown = containsMarkdownSyntax(pastedString)
+            print("🔍 PASTE: Contains markdown?", hasMarkdown)
 
-                    return true
+            if hasMarkdown {
+                // Convert markdown to attributed string with base font
+                normalized = NSAttributedStringMarkdownConverter.convertFromMarkdown(
+                    pastedString,
+                    baseFontSize: parent.font.pointSize
+                )
+                print("🔍 PASTE: After markdown conversion, fonts:", getFontsInAttributedString(normalized))
+
+                // Extra normalization pass to ensure fonts are consistent
+                normalized = normalizeToBaseFontOnly(normalized)
+                print("🔍 PASTE: After normalization, fonts:", getFontsInAttributedString(normalized))
+            } else {
+                // Plain text - apply base font to ALL text
+                let baseAttributes: [NSAttributedString.Key: Any] = [
+                    .font: parent.font,
+                    .foregroundColor: NSColor.textColor
+                ]
+                normalized = NSAttributedString(string: pastedString, attributes: baseAttributes)
+                print("🔍 PASTE: Plain text mode - using base font:", parent.font.fontName, parent.font.pointSize)
+            }
+
+            // Insert the normalized text
+            textStorage.beginEditing()
+            textStorage.replaceCharacters(in: currentRange, with: normalized)
+            textStorage.endEditing()
+
+            // Update selection and reset typing attributes to base font
+            let newLocation = currentRange.location + normalized.length
+            textView.setSelectedRange(NSRange(location: newLocation, length: 0))
+
+            // Ensure typing attributes are reset to base font
+            textView.typingAttributes = [
+                .font: parent.font,
+                .foregroundColor: NSColor.textColor
+            ]
+
+            print("🔍 PASTE: Typing attributes set to:", parent.font.fontName, parent.font.pointSize)
+
+            // Trigger change notification
+            textView.didChangeText()
+
+            print("🔍 PASTE: Complete")
+            return true
+        }
+
+        /// Debug helper to list all unique fonts in an attributed string
+        private func getFontsInAttributedString(_ attributedString: NSAttributedString) -> Set<String> {
+            var fonts = Set<String>()
+            let fullRange = NSRange(location: 0, length: attributedString.length)
+
+            attributedString.enumerateAttributes(in: fullRange) { attributes, _, _ in
+                if let font = attributes[.font] as? NSFont {
+                    fonts.insert("\(font.fontName) \(font.pointSize)pt")
                 }
             }
 
-            return false
+            return fonts
+        }
+
+        /// Aggressively normalizes all fonts to base system font, preserving only bold/italic traits
+        private func normalizeToBaseFontOnly(_ attributedString: NSAttributedString) -> NSAttributedString {
+            let normalized = NSMutableAttributedString()
+            let fullRange = NSRange(location: 0, length: attributedString.length)
+            let text = attributedString.string
+            let baseFont = parent.font
+
+            attributedString.enumerateAttributes(in: fullRange) { attributes, range, _ in
+                let substring = (text as NSString).substring(with: range)
+                guard !substring.isEmpty else { return }
+
+                var newAttributes: [NSAttributedString.Key: Any] = [
+                    .font: baseFont,
+                    .foregroundColor: NSColor.textColor
+                ]
+
+                // ONLY preserve bold and italic traits (from markdown formatting)
+                // Do NOT preserve font family or font size variations
+                if let font = attributes[.font] as? NSFont {
+                    let traits = NSFontManager.shared.traits(of: font)
+                    var newFont = baseFont
+
+                    // Apply bold trait if present
+                    if traits.contains(.boldFontMask) {
+                        newFont = NSFontManager.shared.convert(newFont, toHaveTrait: .boldFontMask)
+                    }
+
+                    // Apply italic trait if present
+                    if traits.contains(.italicFontMask) {
+                        newFont = NSFontManager.shared.convert(newFont, toHaveTrait: .italicFontMask)
+                    }
+
+                    newAttributes[.font] = newFont
+                }
+
+                // Preserve underline (for markdown links)
+                if let underline = attributes[.underlineStyle] {
+                    newAttributes[.underlineStyle] = underline
+                }
+
+                // Preserve paragraph style (for lists, alignment)
+                if let paragraphStyle = attributes[.paragraphStyle] {
+                    newAttributes[.paragraphStyle] = paragraphStyle
+                }
+
+                normalized.append(NSAttributedString(string: substring, attributes: newAttributes))
+            }
+
+            return normalized
         }
 
         private func normalizeFormatting(_ attributedString: NSAttributedString) -> NSAttributedString {

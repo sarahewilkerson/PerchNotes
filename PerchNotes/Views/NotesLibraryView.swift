@@ -166,6 +166,16 @@ struct NotesLibraryView: View {
                     .foregroundColor(CustomColors.contentSecondary)
                     .textCase(.uppercase)
             }
+
+            // Preferences Section
+            Section {
+                PreferencesSectionView()
+            } header: {
+                Text("Preferences")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(CustomColors.contentSecondary)
+                    .textCase(.uppercase)
+            }
         }
         .listStyle(.sidebar)
         .scrollContentBackground(.hidden)

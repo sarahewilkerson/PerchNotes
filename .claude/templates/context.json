@@ -1,0 +1,108 @@
+{
+  "contextLastUpdated" : "2025-10-21T03:18:20Z",
+  "missionStatement" : "The missing middle layer in note-taking. PerchNotes lives in your Mac's menu bar for instant, frictionless capture of messy notes, drafts, pastes, and ideas. More persistent than sticky notes, lighter than Notion - notes organize themselves just enough, then get out of your way to support a flow-state workflow.",
+  "projectName" : "PerchNotes",
+  "projectPath" : "\/Users\/sarahwilkerson\/Developer\/PerchNotes",
+  "userPersonas" : [
+    {
+      "characteristics" : [
+        "Medium-high technical skill",
+        "Works across 8-12 apps simultaneously",
+        "Visual thinker who loses track in app chaos"
+      ],
+      "goals" : [
+        "Capture design feedback from Slack without leaving Figma",
+        "Keep a persistent notepad visible across all app switches",
+        "Access last 5 notes instantly regardless of current app context"
+      ],
+      "id" : "persona-1",
+      "name" : "Maya the Context Switcher",
+      "painPoints" : [
+        "Loses thoughts when switching between Figma, Slack, browser tabs, and email",
+        "Can't remember which app has the note she needed",
+        "Opening Notes app means losing visual context of current work"
+      ],
+      "role" : "Product Designer"
+    },
+    {
+      "characteristics" : [
+        "High technical skill",
+        "Works extensively with AI coding assistants",
+        "Keyboard-first workflow, hates interrupting flow"
+      ],
+      "goals" : [
+        "Stage next 2-3 prompts while current AI conversation completes",
+        "Paste console logs and errors to reference without switching windows",
+        "Keep parallel trains of thought organized without context switching"
+      ],
+      "id" : "persona-2",
+      "name" : "Jordan the Parallel Thinker",
+      "painPoints" : [
+        "Thinks of next prompt\/question while Claude Code is working but doesn't want to interrupt",
+        "Loses track of console errors or debug info that need addressing later",
+        "Opening another app to save thoughts breaks the development flow state"
+      ],
+      "role" : "Software Engineer"
+    },
+    {
+      "characteristics" : [
+        "Medium technical skill",
+        "Synthesizes info from diverse sources",
+        "Organized but needs staging area before formal systems"
+      ],
+      "goals" : [
+        "Collect 10-15 snippets from various sources into one staging note",
+        "Review collected snippets weekly to promote best ones to Notion",
+        "Search past collections when a vague memory surfaces"
+      ],
+      "id" : "persona-3",
+      "name" : "Sam the Collector",
+      "painPoints" : [
+        "Reads 15 articles a day but has nowhere to quickly save key quotes",
+        "Notion feels too heavy for rough idea capture",
+        "Loses great phrases\/stats because saving them requires too many decisions"
+      ],
+      "role" : "Content Strategist"
+    },
+    {
+      "characteristics" : [
+        "High technical skill",
+        "Deep work sessions of 2-4 hours",
+        "Extremely sensitive to context switching"
+      ],
+      "goals" : [
+        "Capture ideas without any visual disruption to current work",
+        "Use only keyboard shortcuts to save thoughts (never touch mouse)",
+        "Review capture log after deep work session to identify next steps"
+      ],
+      "id" : "persona-4",
+      "name" : "Alex the Flow Protector",
+      "painPoints" : [
+        "Opening any app during analysis breaks concentration for 5-10 minutes",
+        "Has ideas for next query but writing them down means leaving SQL editor",
+        "Loses breakthrough insights if capture requires more than 2 seconds"
+      ],
+      "role" : "Data Analyst"
+    },
+    {
+      "characteristics" : [
+        "Medium technical skill",
+        "Assembles content from multiple sources",
+        "Visual editor who needs to see pieces together"
+      ],
+      "goals" : [
+        "Paste 6-8 snippets into one note, rearrange and edit before final use",
+        "Keep composition visible while gathering more pieces",
+        "Copy final assembled version to campaign doc in one click"
+      ],
+      "id" : "persona-5",
+      "name" : "Riley the Clipboard Composer",
+      "painPoints" : [
+        "Needs to combine snippets from 4 emails into one campaign brief",
+        "Clipboard only holds one thing - loses earlier pieces",
+        "TextEdit means naming files and cluttering desktop"
+      ],
+      "role" : "Marketing Manager"
+    }
+  ]
+}

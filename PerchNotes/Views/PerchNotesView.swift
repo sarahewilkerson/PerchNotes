@@ -167,7 +167,7 @@ struct PerchNotesView: View {
 
             Spacer()
 
-            // Right side - Float on top toggle + Size selector
+            // Right side - Float on top toggle + Detach/Attach button + Size selector
             HStack(spacing: 12) {
                 // Float on top button
                 Button(action: {
@@ -179,6 +179,21 @@ struct PerchNotesView: View {
                 }
                 .buttonStyle(.plain)
                 .help(menuBarManager.floatOnTop ? "Unpin from top" : "Pin on top of all windows")
+
+                // Detach/Attach button
+                Button(action: {
+                    if menuBarManager.isDetached {
+                        menuBarManager.attachNotepad()
+                    } else {
+                        menuBarManager.detachNotepad()
+                    }
+                }) {
+                    Image(systemName: menuBarManager.isDetached ? "link" : "link.badge.plus")
+                        .font(.system(size: 13))
+                        .foregroundColor(menuBarManager.isDetached ? CustomColors.actionPrimary : CustomColors.contentSecondary)
+                }
+                .buttonStyle(.plain)
+                .help(menuBarManager.isDetached ? "Attach to menu bar" : "Detach from menu bar")
 
                 // Size selector
                 Menu {
@@ -582,14 +597,14 @@ struct PerchNotesView: View {
 
                 Spacer()
 
-                // View All Notes button (opens library window)
+                // Library button (opens library window)
                 Button(action: {
                     MenuBarManager.shared.openLibraryWindow()
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "square.grid.2x2")
                             .font(.caption)
-                        Text("View All")
+                        Text("Library")
                             .font(.caption)
                             .fontWeight(.medium)
                     }
