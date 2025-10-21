@@ -119,6 +119,13 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     private func showPopover(relativeTo view: NSView) {
+        // If preferred size is Large, show detached window instead
+        if popoverSize == .large {
+            detachNotepad()
+            positionLargeWindow()
+            return
+        }
+
         guard let popover = popover else { return }
 
         popover.show(relativeTo: view.bounds, of: view, preferredEdge: .minY)
@@ -162,13 +169,44 @@ class MenuBarManager: NSObject, ObservableObject {
 
     func resizePopover(to size: PopoverSize) {
         popoverSize = size
-        popover?.contentSize = size.dimensions
 
-        // Animate the resize
+        // For Large size, switch to detached mode and position flush top-right
+        if size == .large && !isDetached {
+            detachNotepad()
+            positionLargeWindow()
+        } else if isDetached {
+            resizeDetachedWindow(to: size)
+            if size == .large {
+                positionLargeWindow()
+            }
+        } else {
+            popover?.contentSize = size.dimensions
+
+            // Animate the resize
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.2
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                popover?.contentSize = size.dimensions
+            }
+        }
+    }
+
+    private func positionLargeWindow() {
+        guard let window = detachedWindow, let screen = NSScreen.main else { return }
+
+        let screenFrame = screen.visibleFrame
+        let windowSize = popoverSize.dimensions
+
+        // Position flush with top-right corner
+        let xPos = screenFrame.maxX - windowSize.width
+        let yPos = screenFrame.maxY - windowSize.height
+
+        let newFrame = NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height)
+
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            popover?.contentSize = size.dimensions
+            window.animator().setFrame(newFrame, display: true)
         }
     }
 
@@ -275,12 +313,24 @@ class MenuBarManager: NSObject, ObservableObject {
         window.setContentSize(preferredSize.dimensions)
         window.isReleasedWhenClosed = false
 
-        // Restore saved position or position below menu bar
-        if let frameString = UserDefaults.standard.string(forKey: detachedWindowFrameKey),
-           let savedFrame = NSRectFromString(frameString) as NSRect? {
+        // Position based on size
+        if popoverSize == .large {
+            // Large size: flush with top-right corner
+            if let screen = NSScreen.main {
+                let screenFrame = screen.visibleFrame
+                let windowSize = preferredSize.dimensions
+                let xPos = screenFrame.maxX - windowSize.width
+                let yPos = screenFrame.maxY - windowSize.height
+                window.setFrame(NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height), display: true)
+            } else {
+                window.center()
+            }
+        } else if let frameString = UserDefaults.standard.string(forKey: detachedWindowFrameKey),
+                  let savedFrame = NSRectFromString(frameString) as NSRect? {
+            // Restore saved position for other sizes
             window.setFrame(savedFrame, display: true)
         } else {
-            // Position below menu bar icon
+            // Default: Position below menu bar icon
             if let button = statusBarItem?.button, let screen = NSScreen.main {
                 let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
                 let windowSize = popoverSize.dimensions
