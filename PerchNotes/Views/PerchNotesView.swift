@@ -188,7 +188,7 @@ struct PerchNotesView: View {
                         menuBarManager.detachNotepad()
                     }
                 }) {
-                    Image(systemName: menuBarManager.isDetached ? "link" : "link.badge.plus")
+                    Image(systemName: menuBarManager.isDetached ? "location.circle.fill" : "location.north.circle")
                         .font(.system(size: 13))
                         .foregroundColor(menuBarManager.isDetached ? CustomColors.actionPrimary : CustomColors.contentSecondary)
                 }
