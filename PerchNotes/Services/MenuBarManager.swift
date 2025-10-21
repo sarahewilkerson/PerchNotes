@@ -15,6 +15,7 @@ class MenuBarManager: NSObject, ObservableObject {
     @Published var isDetached = false
     @Published var popoverSize: PopoverSize = .default
     @Published var floatOnTop = false
+    @Published var isFormattingToolbarVisible = false
 
     private let detachedWindowFrameKey = "detachedWindowFrame"
 
@@ -413,10 +414,18 @@ class MenuBarManager: NSObject, ObservableObject {
 
         let window = NSWindow(contentViewController: hostingController)
         window.title = "PerchNotes Library"
-        window.setContentSize(NSSize(width: 1200, height: 800))
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.center()
         window.isReleasedWhenClosed = false
+
+        // Set window to fill visible screen (excludes menu bar and dock)
+        if let screen = NSScreen.main {
+            let visibleFrame = screen.visibleFrame
+            window.setFrame(visibleFrame, display: true)
+        } else {
+            // Fallback to centered window
+            window.setContentSize(NSSize(width: 1200, height: 800))
+            window.center()
+        }
 
         libraryWindow = window
         window.makeKeyAndOrderFront(nil)

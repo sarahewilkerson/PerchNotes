@@ -156,6 +156,7 @@ struct PerchNotesView: View {
                 Button("") {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showFormattingToolbar.toggle()
+                        menuBarManager.isFormattingToolbarVisible = showFormattingToolbar
                     }
                 }
                 .keyboardShortcut("f", modifiers: [.command, .shift])
@@ -476,6 +477,7 @@ struct PerchNotesView: View {
                         Button(action: {
                             withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                                 showFormattingToolbar = false
+                                menuBarManager.isFormattingToolbarVisible = false
                             }
                         }) {
                             Image(systemName: "chevron.left")
@@ -543,6 +545,7 @@ struct PerchNotesView: View {
                     Button(action: {
                         withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                             showFormattingToolbar = true
+                            menuBarManager.isFormattingToolbarVisible = true
                         }
                     }) {
                         HStack(spacing: 4) {

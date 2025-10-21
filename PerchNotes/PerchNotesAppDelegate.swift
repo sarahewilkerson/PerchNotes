@@ -11,7 +11,7 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         MenuBarManager.shared.enableMenuBar()
 
         // Show onboarding after a short delay on first launch
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             if OnboardingManager.shared.shouldShowOnboarding {
                 self.showOnboardingWindow()
             }
@@ -77,14 +77,23 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         // Start below menu bar icon (like a popover)
         window.setContentSize(NSSize(width: 580, height: 720))
 
-        if let button = MenuBarManager.shared.statusBarButton, let screen = NSScreen.main {
-            let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
-            let windowSize = NSSize(width: 580, height: 720)
+        if let button = MenuBarManager.shared.statusBarButton,
+           let buttonWindow = button.window,
+           let screen = NSScreen.main {
+            let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+            let screenHeight = screen.frame.height
 
-            let xPos = buttonFrame.midX - (windowSize.width / 2)
-            let yPos = buttonFrame.minY - windowSize.height - 8
+            // Verify we got a valid frame (menu bar should be near top of screen)
+            if buttonFrame.origin.y > screenHeight * 0.8 {
+                let windowSize = NSSize(width: 580, height: 720)
+                let xPos = buttonFrame.midX - (windowSize.width / 2)
+                let yPos = buttonFrame.minY - windowSize.height - 8
 
-            window.setFrame(NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height), display: true)
+                window.setFrame(NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height), display: true)
+            } else {
+                // Button frame not ready, center the window
+                window.center()
+            }
         } else {
             window.center()
         }
@@ -92,6 +101,38 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         onboardingWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+
+        // If button wasn't ready, try repositioning after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.tryRepositionOnboarding()
+        }
+    }
+
+    @MainActor
+    private func tryRepositionOnboarding() {
+        guard let window = onboardingWindow,
+              let button = MenuBarManager.shared.statusBarButton,
+              let buttonWindow = button.window,
+              let screen = NSScreen.main else { return }
+
+        let buttonFrame = buttonWindow.convertToScreen(button.convert(button.bounds, to: nil))
+        let screenHeight = screen.frame.height
+
+        // Only reposition if we have a valid button frame (menu bar should be near top)
+        if buttonFrame.origin.y > screenHeight * 0.8 {
+            let windowSize = NSSize(width: 580, height: 720)
+            let xPos = buttonFrame.midX - (windowSize.width / 2)
+            let yPos = buttonFrame.minY - windowSize.height - 8
+
+            let newFrame = NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height)
+
+            // Smoothly animate to the correct position
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.3
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                window.animator().setFrame(newFrame, display: true)
+            })
+        }
     }
 
     @MainActor

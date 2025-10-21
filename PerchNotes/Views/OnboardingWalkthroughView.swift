@@ -58,7 +58,7 @@ struct OnboardingWalkthroughView: View {
                         WalkthroughStep(
                             stepNumber: 2,
                             title: "Pin or Unpin",
-                            description: "Notice the **pin icon** is active at the top right? This keeps PerchNotes floating above other windows so you can work with notes alongside other apps.\n\nIt's pinned for this walkthrough, but you can unpin anytime by clicking the icon.",
+                            description: "Notice the **pin icon** is active at the top right? This keeps PerchNotes floating above other windows so you can work with notes alongside other apps.\n\n**Try it:** Click the pin icon to unpin. (Don't worry - we'll re-pin it automatically for the next step!)",
                             isCompleted: completedSteps.contains(2),
                             isExpanded: expandedStep == 2,
                             onToggle: { toggleStep(2) },
@@ -68,7 +68,7 @@ struct OnboardingWalkthroughView: View {
                         WalkthroughStep(
                             stepNumber: 3,
                             title: "Format your notes",
-                            description: "PerchNotes always shows a clean, formatted view. You can:\n• Paste in markdown and see it formatted instantly\n• Use keyboard shortcuts (**Cmd+B** for bold, **Cmd+I** for italic, **Cmd+Opt+1** for headings)\n• Click formatting buttons in the toolbar\n• Or just type plain markdown syntax as you work. Go ahead and give it a try!",
+                            description: "PerchNotes always shows a clean, formatted view. You can:\n• Paste in markdown and see it formatted instantly\n• Use keyboard shortcuts (**Cmd+B** for bold, **Cmd+I** for italic, **Cmd+Opt+1** for headings)\n• Click formatting buttons in the toolbar\n• Or just type plain markdown syntax as you work\n\n**Try it:** Click the **Aa >** button to expand the formatting toolbar!",
                             isCompleted: completedSteps.contains(3),
                             isExpanded: expandedStep == 3,
                             onToggle: { toggleStep(3) },
@@ -190,6 +190,16 @@ struct OnboardingWalkthroughView: View {
             // Step 2: Pin or Unpin - complete if they unpin
             if !newValue && !completedSteps.contains(2) {
                 completeStep(2)
+                // Re-pin after a brief delay for step 3
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                    menuBarManager.setFloatOnTop(true)
+                }
+            }
+        }
+        .onChange(of: menuBarManager.isFormattingToolbarVisible) { newValue in
+            // Step 3: Format your notes - complete when they expand the toolbar
+            if newValue && !completedSteps.contains(3) {
+                completeStep(3)
             }
         }
         .onChange(of: appPreferences.preferredCopyFormat) { _ in
