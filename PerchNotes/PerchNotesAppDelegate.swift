@@ -74,9 +74,20 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         window.styleMask = [.titled, .closable]
         window.isReleasedWhenClosed = false
 
-        // Start centered
+        // Start below menu bar icon (like a popover)
         window.setContentSize(NSSize(width: 580, height: 720))
-        window.center()
+
+        if let button = MenuBarManager.shared.statusBarButton, let screen = NSScreen.main {
+            let buttonFrame = button.window?.convertToScreen(button.convert(button.bounds, to: nil)) ?? .zero
+            let windowSize = NSSize(width: 580, height: 720)
+
+            let xPos = buttonFrame.midX - (windowSize.width / 2)
+            let yPos = buttonFrame.minY - windowSize.height - 8
+
+            window.setFrame(NSRect(x: xPos, y: yPos, width: windowSize.width, height: windowSize.height), display: true)
+        } else {
+            window.center()
+        }
 
         onboardingWindow = window
         window.makeKeyAndOrderFront(nil)

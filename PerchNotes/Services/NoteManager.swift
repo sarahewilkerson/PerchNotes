@@ -34,6 +34,9 @@ class NoteManager: ObservableObject {
         loadCategories()
         loadFolders()
         loadDraft()
+
+        // Clean up old trashed notes (30+ days)
+        cleanupOldTrashedNotes()
     }
 
     // MARK: - Notes Management
@@ -67,14 +70,59 @@ class NoteManager: ObservableObject {
     }
 
     func deleteNote(_ note: Note) {
+        // Move to trash instead of permanently deleting
+        moveToTrash(note)
+    }
+
+    func deleteNotes(_ notesToDelete: [Note]) {
+        // Move to trash instead of permanently deleting
+        for note in notesToDelete {
+            moveToTrash(note)
+        }
+    }
+
+    func moveToTrash(_ note: Note) {
+        if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[index].isTrashed = true
+            notes[index].deletedAt = Date()
+            notes[index].updatedAt = Date()
+            saveNotes()
+        }
+    }
+
+    func restoreFromTrash(_ note: Note) {
+        if let index = notes.firstIndex(where: { $0.id == note.id }) {
+            notes[index].isTrashed = false
+            notes[index].deletedAt = nil
+            notes[index].updatedAt = Date()
+            saveNotes()
+        }
+    }
+
+    func permanentlyDelete(_ note: Note) {
         notes.removeAll { $0.id == note.id }
         saveNotes()
     }
 
-    func deleteNotes(_ notesToDelete: [Note]) {
-        let idsToDelete = Set(notesToDelete.map { $0.id })
-        notes.removeAll { idsToDelete.contains($0.id) }
+    func emptyTrash() {
+        notes.removeAll { $0.isTrashed }
         saveNotes()
+    }
+
+    /// Auto-deletes notes that have been in trash for 30+ days
+    func cleanupOldTrashedNotes() {
+        notes.removeAll { $0.shouldAutoDelete }
+        saveNotes()
+    }
+
+    /// Returns only active (non-trashed) notes
+    var activeNotes: [Note] {
+        notes.filter { !$0.isTrashed }
+    }
+
+    /// Returns only trashed notes
+    var trashedNotes: [Note] {
+        notes.filter { $0.isTrashed }
     }
 
     // MARK: - Categories Management

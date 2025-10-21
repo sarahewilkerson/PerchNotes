@@ -18,18 +18,29 @@ class MenuBarManager: NSObject, ObservableObject {
 
     private let detachedWindowFrameKey = "detachedWindowFrame"
 
+    // Expose status bar button for positioning
+    var statusBarButton: NSStatusBarButton? {
+        return statusBarItem?.button
+    }
+
     enum PopoverSize {
         case compact    // 380 x 500
         case `default`  // 480 x 600
         case expanded   // 600 x 800
-        case large      // 800 x 900
+        case large      // Half screen width x Full height
 
         var dimensions: NSSize {
             switch self {
             case .compact: return NSSize(width: 380, height: 500)
             case .default: return NSSize(width: 480, height: 600)
             case .expanded: return NSSize(width: 600, height: 800)
-            case .large: return NSSize(width: 800, height: 900)
+            case .large:
+                // Use half screen width and full available height
+                guard let screen = NSScreen.main else {
+                    return NSSize(width: 800, height: 900)
+                }
+                let screenFrame = screen.visibleFrame
+                return NSSize(width: screenFrame.width / 2, height: screenFrame.height)
             }
         }
 
@@ -125,8 +136,12 @@ class MenuBarManager: NSObject, ObservableObject {
     }
 
     private func createPopover() {
+        // Use preferred size
+        let preferredSize = AppPreferences.shared.popoverSizeEnum
+        popoverSize = preferredSize
+
         popover = NSPopover()
-        popover?.contentSize = popoverSize.dimensions
+        popover?.contentSize = preferredSize.dimensions
         popover?.behavior = .transient
         popover?.animates = true
 
@@ -236,6 +251,10 @@ class MenuBarManager: NSObject, ObservableObject {
             return
         }
 
+        // Use preferred size
+        let preferredSize = AppPreferences.shared.popoverSizeEnum
+        popoverSize = preferredSize
+
         let contentView = PerchNotesView(
             onClose: { [weak self] in
                 self?.hideDetachedWindow()
@@ -253,7 +272,7 @@ class MenuBarManager: NSObject, ObservableObject {
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
-        window.setContentSize(popoverSize.dimensions)
+        window.setContentSize(preferredSize.dimensions)
         window.isReleasedWhenClosed = false
 
         // Restore saved position or position below menu bar

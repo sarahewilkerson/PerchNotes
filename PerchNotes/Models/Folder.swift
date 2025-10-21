@@ -43,7 +43,7 @@ extension Folder {
         case ideas = "lightbulb"
         case archive = "archivebox"
         case favorites = "star"
-        case projects = "hammer"
+        case folders = "hammer"
         case notes = "note.text"
 
         var systemName: String {
@@ -58,7 +58,7 @@ extension Folder {
             case .ideas: return "Ideas"
             case .archive: return "Archive"
             case .favorites: return "Favorites"
-            case .projects: return "Projects"
+            case .folders: return "Folders"
             case .notes: return "Notes"
             }
         }

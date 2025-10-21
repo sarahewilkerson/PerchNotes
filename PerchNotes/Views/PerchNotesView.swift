@@ -4,6 +4,7 @@ import AppKit
 struct PerchNotesView: View {
     @ObservedObject var noteManager = NoteManager.shared
     @ObservedObject var menuBarManager = MenuBarManager.shared
+    @ObservedObject var appPreferences = AppPreferences.shared
 
     let onClose: () -> Void
     let onResizeRequest: (MenuBarManager.PopoverSize) -> Void
@@ -72,6 +73,8 @@ struct PerchNotesView: View {
             if !noteManager.draftContent.isEmpty {
                 attributedDraft = noteManager.draftContent.toAttributedString()
             }
+            // Set current size to match the preferred size
+            currentSize = appPreferences.popoverSizeEnum
         }
         .background {
             // Hidden keyboard shortcut handlers
@@ -147,7 +150,7 @@ struct PerchNotesView: View {
 
     private var headerView: some View {
         HStack(spacing: 12) {
-            // Left side - App icon + Project dropdown
+            // Left side - App icon + Folder dropdown
             HStack(spacing: 8) {
                 // App icon with transparency
                 if let appIcon = NSImage(named: "AppIconTransparent") {
@@ -161,8 +164,8 @@ struct PerchNotesView: View {
                         .foregroundColor(CustomColors.actionPrimary)
                 }
 
-                // Project dropdown (folder/category selector)
-                projectPickerMenu
+                // Folder dropdown (folder/category selector)
+                folderPickerMenu
             }
 
             Spacer()
@@ -197,10 +200,61 @@ struct PerchNotesView: View {
 
                 // Size selector
                 Menu {
-                    Button("Compact") { onResizeRequest(.compact); currentSize = .compact }
-                    Button("Default") { onResizeRequest(.default); currentSize = .default }
-                    Button("Expanded") { onResizeRequest(.expanded); currentSize = .expanded }
-                    Button("Large") { onResizeRequest(.large); currentSize = .large }
+                    Button(action: {
+                        onResizeRequest(.compact)
+                        currentSize = .compact
+                        appPreferences.preferredPopoverSize = "compact"
+                    }) {
+                        HStack {
+                            Text("Compact")
+                            if appPreferences.preferredPopoverSize == "compact" {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Button(action: {
+                        onResizeRequest(.default)
+                        currentSize = .default
+                        appPreferences.preferredPopoverSize = "default"
+                    }) {
+                        HStack {
+                            Text("Default")
+                            if appPreferences.preferredPopoverSize == "default" {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Button(action: {
+                        onResizeRequest(.expanded)
+                        currentSize = .expanded
+                        appPreferences.preferredPopoverSize = "expanded"
+                    }) {
+                        HStack {
+                            Text("Expanded")
+                            if appPreferences.preferredPopoverSize == "expanded" {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Button(action: {
+                        onResizeRequest(.large)
+                        currentSize = .large
+                        appPreferences.preferredPopoverSize = "large"
+                    }) {
+                        HStack {
+                            Text("Large")
+                            if appPreferences.preferredPopoverSize == "large" {
+                                Spacer()
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
                 } label: {
                     HStack(spacing: 6) {
                         Image(systemName: "arrow.up.left.and.arrow.down.right")
@@ -213,7 +267,7 @@ struct PerchNotesView: View {
                     .foregroundColor(CustomColors.contentSecondary)
                 }
                 .buttonStyle(.plain)
-                .help("Resize window")
+                .help("Resize window (checkmark = default)")
             }
         }
         .padding(.horizontal, 16)
@@ -221,7 +275,7 @@ struct PerchNotesView: View {
         .background(CustomColors.surfaceBase)
     }
 
-    private var projectPickerMenu: some View {
+    private var folderPickerMenu: some View {
         Menu {
             // Folder section
             if !noteManager.folders.isEmpty {
@@ -277,8 +331,8 @@ struct PerchNotesView: View {
                 Image(systemName: "folder")
                     .font(.system(size: 14))
 
-                // Show current selection or "Project"
-                Text(projectDisplayName)
+                // Show current selection or "Folder"
+                Text(folderDisplayName)
                     .font(.system(size: 14))
 
                 Image(systemName: "chevron.down")
@@ -289,13 +343,13 @@ struct PerchNotesView: View {
         .buttonStyle(.plain)
     }
 
-    private var projectDisplayName: String {
+    private var folderDisplayName: String {
         if let folder = selectedFolder {
             return folder.name
         } else if let category = selectedCategory {
             return category.name
         } else {
-            return "Project"
+            return "Folder"
         }
     }
 
@@ -348,7 +402,7 @@ struct PerchNotesView: View {
         .buttonStyle(.plain)
     }
 
-    private var folderPickerMenu: some View {
+    private var folder2PickerMenu: some View {
         Menu {
             Button("No Folder") {
                 selectedFolder = nil
@@ -587,7 +641,7 @@ struct PerchNotesView: View {
                             .fontWeight(.medium)
                             .foregroundColor(CustomColors.contentSecondary)
 
-                        Text("(\(min(noteManager.notes.count, 20)))")
+                        Text("(\(min(noteManager.activeNotes.count, 20)))")
                             .font(.caption)
                             .foregroundColor(CustomColors.contentTertiary)
                     }
@@ -621,7 +675,7 @@ struct PerchNotesView: View {
             if showRecentNotes {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(Array(noteManager.notes.prefix(20))) { note in
+                        ForEach(Array(noteManager.activeNotes.prefix(20))) { note in
                             RecentNoteCard(note: note) {
                                 // Copy note content to capture area
                                 attributedDraft = note.attributedContent

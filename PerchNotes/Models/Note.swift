@@ -12,6 +12,32 @@ struct Note: Identifiable, Codable {
     var createdAt: Date
     var updatedAt: Date
     var isPinned: Bool
+    var isTrashed: Bool
+    var deletedAt: Date?
+
+    // Custom coding keys for backwards compatibility
+    enum CodingKeys: String, CodingKey {
+        case id, title, content, categoryID, folderID, tags
+        case createdAt, updatedAt, isPinned, isTrashed, deletedAt
+    }
+
+    // Custom decoder to provide default values for new properties
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        content = try container.decode(String.self, forKey: .content)
+        categoryID = try container.decodeIfPresent(UUID.self, forKey: .categoryID)
+        folderID = try container.decodeIfPresent(UUID.self, forKey: .folderID)
+        tags = try container.decode([String].self, forKey: .tags)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        isPinned = try container.decode(Bool.self, forKey: .isPinned)
+
+        // New properties with default values for backwards compatibility
+        isTrashed = try container.decodeIfPresent(Bool.self, forKey: .isTrashed) ?? false
+        deletedAt = try container.decodeIfPresent(Date.self, forKey: .deletedAt)
+    }
 
     init(
         id: UUID = UUID(),
@@ -22,7 +48,9 @@ struct Note: Identifiable, Codable {
         tags: [String] = [],
         createdAt: Date = Date(),
         updatedAt: Date = Date(),
-        isPinned: Bool = false
+        isPinned: Bool = false,
+        isTrashed: Bool = false,
+        deletedAt: Date? = nil
     ) {
         self.id = id
         self.title = title
@@ -33,6 +61,8 @@ struct Note: Identifiable, Codable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.isPinned = isPinned
+        self.isTrashed = isTrashed
+        self.deletedAt = deletedAt
     }
 
     /// Creates an attributed string from the markdown content
@@ -81,5 +111,36 @@ struct Note: Identifiable, Codable {
     var preview: String {
         let text = content.prefix(100)
         return String(text) + (content.count > 100 ? "..." : "")
+    }
+
+    /// Generates a smart title from the first three words of content
+    var smartTitle: String {
+        // If title is already set and not empty, use it
+        if !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return title
+        }
+
+        // Extract first three words from content
+        let cleanContent = content
+            .replacingOccurrences(of: #"^#+\s*"#, with: "", options: .regularExpression) // Remove markdown headers
+            .replacingOccurrences(of: #"[*_`]"#, with: "", options: .regularExpression) // Remove markdown formatting
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let words = cleanContent.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .prefix(3)
+
+        if words.isEmpty {
+            return "Untitled Note"
+        }
+
+        return words.joined(separator: " ")
+    }
+
+    /// Returns true if note should be auto-deleted (30 days in trash)
+    var shouldAutoDelete: Bool {
+        guard isTrashed, let deletedAt = deletedAt else { return false }
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        return deletedAt < thirtyDaysAgo
     }
 }

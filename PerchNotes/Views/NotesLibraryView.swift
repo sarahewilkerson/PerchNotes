@@ -15,19 +15,53 @@ struct NotesLibraryView: View {
     @State private var showPinnedOnly = false
     @State private var selectedNote: Note?
     @State private var showingNoteDetail = false
+    @State private var showingTrash = false
 
     private var filteredNotes: [Note] {
-        noteManager.searchNotes(
-            query: searchText,
-            folderID: selectedFolder?.id,
-            categoryID: selectedCategory?.id,
-            tag: selectedTag,
-            createdAfter: createdAfter,
-            createdBefore: createdBefore,
-            updatedAfter: updatedAfter,
-            updatedBefore: updatedBefore,
-            isPinned: showPinnedOnly ? true : nil
-        )
+        let allNotes = showingTrash ? noteManager.trashedNotes : noteManager.activeNotes
+
+        return allNotes.filter { note in
+            // Search query
+            if !searchText.isEmpty && !note.matches(searchText: searchText) {
+                return false
+            }
+
+            // Folder filter
+            if let folderID = selectedFolder?.id, note.folderID != folderID {
+                return false
+            }
+
+            // Category filter
+            if let categoryID = selectedCategory?.id, note.categoryID != categoryID {
+                return false
+            }
+
+            // Tag filter
+            if let tag = selectedTag, !note.hasTag(tag) {
+                return false
+            }
+
+            // Date filters
+            if let createdAfter = createdAfter, note.createdAt < createdAfter {
+                return false
+            }
+            if let createdBefore = createdBefore, note.createdAt > createdBefore {
+                return false
+            }
+            if let updatedAfter = updatedAfter, note.updatedAt < updatedAfter {
+                return false
+            }
+            if let updatedBefore = updatedBefore, note.updatedAt > updatedBefore {
+                return false
+            }
+
+            // Pinned filter
+            if showPinnedOnly && !note.isPinned {
+                return false
+            }
+
+            return true
+        }
     }
 
     var body: some View {
@@ -136,6 +170,48 @@ struct NotesLibraryView: View {
                 }
             }
 
+            // Trash Section
+            Section {
+                Button(action: {
+                    showingTrash.toggle()
+                    if showingTrash {
+                        // Clear filters when viewing trash
+                        selectedFolder = nil
+                        selectedCategory = nil
+                        selectedTag = nil
+                    }
+                }) {
+                    HStack {
+                        Label("Trash", systemImage: "trash")
+                            .foregroundColor(showingTrash ? CustomColors.actionPrimary : CustomColors.contentPrimary)
+                            .fontWeight(showingTrash ? .semibold : .regular)
+
+                        Spacer()
+
+                        Text("\(noteManager.trashedNotes.count)")
+                            .foregroundColor(CustomColors.contentSecondary)
+                            .font(.system(size: 11))
+                    }
+                }
+                .buttonStyle(.plain)
+
+                if showingTrash && !noteManager.trashedNotes.isEmpty {
+                    Button(action: {
+                        noteManager.emptyTrash()
+                    }) {
+                        Label("Empty Trash", systemImage: "trash.slash")
+                            .foregroundColor(.red)
+                            .font(.system(size: 13))
+                    }
+                    .buttonStyle(.plain)
+                }
+            } header: {
+                Text("System")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(CustomColors.contentSecondary)
+                    .textCase(.uppercase)
+            }
+
             // Filters Section
             Section {
                 Toggle(isOn: $showPinnedOnly) {
@@ -143,6 +219,7 @@ struct NotesLibraryView: View {
                         .foregroundColor(CustomColors.contentPrimary)
                 }
                 .tint(CustomColors.actionPrimary)
+                .disabled(showingTrash)
 
                 Button(action: {
                     showingDateFilter.toggle()
@@ -195,13 +272,13 @@ struct NotesLibraryView: View {
                         .frame(width: 28, height: 28)
                 }
 
-                Text("PerchNotes Library")
+                Text(showingTrash ? "Trash" : "PerchNotes Library")
                     .font(.system(size: 15, weight: .semibold))
                     .foregroundColor(CustomColors.contentPrimary)
 
                 Spacer()
 
-                Text("\(filteredNotes.count) notes")
+                Text("\(filteredNotes.count) \(showingTrash ? "trashed" : "") note\(filteredNotes.count == 1 ? "" : "s")")
                     .font(.system(size: 13))
                     .foregroundColor(CustomColors.contentSecondary)
 
@@ -237,10 +314,12 @@ struct NotesLibraryView: View {
                         GridItem(.adaptive(minimum: 300, maximum: 400), spacing: 16)
                     ], spacing: 16) {
                         ForEach(filteredNotes) { note in
-                            NoteCardView(note: note)
+                            NoteCardView(note: note, showingTrash: showingTrash)
                                 .onTapGesture {
-                                    selectedNote = note
-                                    showingNoteDetail = true
+                                    if !showingTrash {
+                                        selectedNote = note
+                                        showingNoteDetail = true
+                                    }
                                 }
                         }
                     }
@@ -254,15 +333,15 @@ struct NotesLibraryView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "doc.text")
+            Image(systemName: showingTrash ? "trash" : "doc.text")
                 .font(.system(size: 60))
                 .foregroundColor(CustomColors.contentSecondary)
 
-            Text("No notes found")
+            Text(showingTrash ? "Trash is empty" : "No notes found")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundColor(CustomColors.contentPrimary)
 
-            Text("Try adjusting your search or filters")
+            Text(showingTrash ? "Deleted notes will appear here" : "Try adjusting your search or filters")
                 .font(.system(size: 14))
                 .foregroundColor(CustomColors.contentSecondary)
         }
@@ -294,34 +373,40 @@ struct FolderRow: View {
 
 struct NoteCardView: View {
     let note: Note
+    let showingTrash: Bool
     @ObservedObject var noteManager = NoteManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             // Header
             HStack(alignment: .top, spacing: 8) {
-                if note.isPinned {
+                if note.isPinned && !showingTrash {
                     Image(systemName: "pin.fill")
                         .font(.system(size: 11))
                         .foregroundColor(CustomColors.actionPrimary)
                 }
 
-                if !note.title.isEmpty {
-                    Text(note.title)
-                        .font(.system(size: 15, weight: .semibold))
-                        .lineLimit(1)
-                } else {
-                    Text("Untitled")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(CustomColors.contentSecondary)
-                        .lineLimit(1)
-                }
+                Text(note.smartTitle)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(showingTrash ? CustomColors.contentSecondary : CustomColors.contentPrimary)
+                    .lineLimit(1)
 
                 Spacer()
 
-                Text(note.createdAt, style: .date)
-                    .font(.system(size: 11))
-                    .foregroundColor(CustomColors.contentSecondary)
+                if showingTrash {
+                    // Show days remaining until auto-delete
+                    if let deletedAt = note.deletedAt {
+                        let daysSinceDeleted = Calendar.current.dateComponents([.day], from: deletedAt, to: Date()).day ?? 0
+                        let daysRemaining = max(0, 30 - daysSinceDeleted)
+                        Text("\(daysRemaining)d")
+                            .font(.system(size: 11))
+                            .foregroundColor(daysRemaining < 7 ? .red : CustomColors.contentSecondary)
+                    }
+                } else {
+                    Text(note.createdAt, style: .date)
+                        .font(.system(size: 11))
+                        .foregroundColor(CustomColors.contentSecondary)
+                }
             }
 
             // Content preview
@@ -331,38 +416,88 @@ struct NoteCardView: View {
                 .lineLimit(3)
                 .fixedSize(horizontal: false, vertical: true)
 
-            // Footer with tags and category
+            // Footer with tags, category, and actions
             HStack(alignment: .center, spacing: 8) {
-                // Tags
-                if !note.tags.isEmpty {
-                    HStack(spacing: 4) {
-                        ForEach(note.tags.prefix(3), id: \.self) { tag in
-                            Text(tag)
-                                .font(.system(size: 10))
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(CustomColors.actionPrimary.opacity(0.2))
-                                .cornerRadius(4)
+                if showingTrash {
+                    // Trash actions
+                    HStack(spacing: 8) {
+                        Button(action: {
+                            noteManager.restoreFromTrash(note)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.uturn.backward")
+                                    .font(.system(size: 11))
+                                Text("Restore")
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(CustomColors.actionPrimary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(CustomColors.actionPrimary.opacity(0.1))
+                            .cornerRadius(4)
                         }
-                        if note.tags.count > 3 {
-                            Text("+\(note.tags.count - 3)")
-                                .font(.system(size: 10))
-                                .foregroundColor(CustomColors.contentSecondary)
+                        .buttonStyle(.plain)
+
+                        Button(action: {
+                            noteManager.permanentlyDelete(note)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "trash.slash")
+                                    .font(.system(size: 11))
+                                Text("Delete Forever")
+                                    .font(.system(size: 11))
+                            }
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.red.opacity(0.1))
+                            .cornerRadius(4)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                } else {
+                    // Tags
+                    if !note.tags.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(note.tags.prefix(3), id: \.self) { tag in
+                                Text(tag)
+                                    .font(.system(size: 10))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(CustomColors.actionPrimary.opacity(0.2))
+                                    .cornerRadius(4)
+                            }
+                            if note.tags.count > 3 {
+                                Text("+\(note.tags.count - 3)")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(CustomColors.contentSecondary)
+                            }
                         }
                     }
-                }
 
-                Spacer()
+                    Spacer()
 
-                // Category
-                if let category = noteManager.category(for: note) {
-                    HStack(spacing: 4) {
-                        Circle()
-                            .fill(category.color.color)
-                            .frame(width: 8, height: 8)
-                        Text(category.name)
+                    // Delete button
+                    Button(action: {
+                        noteManager.moveToTrash(note)
+                    }) {
+                        Image(systemName: "trash")
                             .font(.system(size: 11))
                             .foregroundColor(CustomColors.contentSecondary)
+                    }
+                    .buttonStyle(.plain)
+                    .help("Move to trash")
+
+                    // Category
+                    if let category = noteManager.category(for: note) {
+                        HStack(spacing: 4) {
+                            Circle()
+                                .fill(category.color.color)
+                                .frame(width: 8, height: 8)
+                            Text(category.name)
+                                .font(.system(size: 11))
+                                .foregroundColor(CustomColors.contentSecondary)
+                        }
                     }
                 }
             }
@@ -489,7 +624,7 @@ struct NoteDetailView: View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text(note.title.isEmpty ? "Untitled" : note.title)
+                Text(note.smartTitle)
                     .font(.system(size: 20, weight: .semibold))
                     .foregroundColor(CustomColors.contentPrimary)
 
