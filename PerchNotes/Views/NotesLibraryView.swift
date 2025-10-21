@@ -13,8 +13,7 @@ struct NotesLibraryView: View {
     @State private var updatedAfter: Date?
     @State private var updatedBefore: Date?
     @State private var showPinnedOnly = false
-    @State private var selectedNote: Note?
-    @State private var showingNoteDetail = false
+    @State private var noteToShow: Note?
     @State private var showingTrash = false
 
     private var filteredNotes: [Note] {
@@ -75,10 +74,11 @@ struct NotesLibraryView: View {
         }
         .background(CustomColors.surfaceBase)
         .searchable(text: $searchText, prompt: "Search notes...")
-        .sheet(isPresented: $showingNoteDetail) {
-            if let note = selectedNote {
-                NoteDetailView(note: note)
-            }
+        .sheet(item: $noteToShow) { note in
+            NoteDetailView(note: note)
+                .onAppear {
+                    print("🔍 Sheet appeared with note: \(note.smartTitle)")
+                }
         }
     }
 
@@ -317,8 +317,11 @@ struct NotesLibraryView: View {
                             NoteCardView(note: note, showingTrash: showingTrash)
                                 .onTapGesture {
                                     if !showingTrash {
-                                        selectedNote = note
-                                        showingNoteDetail = true
+                                        print("🔍 Note tapped: \(note.smartTitle)")
+                                        print("🔍 Note ID: \(note.id)")
+                                        print("🔍 Note content length: \(note.content.count)")
+                                        noteToShow = note
+                                        print("🔍 noteToShow set to: \(note.smartTitle)")
                                     }
                                 }
                         }
@@ -616,80 +619,433 @@ struct DateFilterView: View {
 // MARK: - Note Detail View
 
 struct NoteDetailView: View {
-    let note: Note
+    var note: Note
     @Environment(\.dismiss) var dismiss
     @ObservedObject var noteManager = NoteManager.shared
+    @ObservedObject var appPreferences = AppPreferences.shared
+
+    @State private var attributedText: NSAttributedString
+    @State private var selectedRange = NSRange(location: 0, length: 0)
+    @State private var textView: NSTextView?
+    @State private var showFormattingToolbar = false
+    @State private var noteTitle: String
+    @State private var noteTags: [String]
+    @State private var newTag = ""
+    @State private var preferredCopyFormat: CopyFormat = .markdown
+
+    enum CopyFormat: String, CaseIterable {
+        case markdown = "Markdown"
+        case plainText = "Plain Text"
+        case richText = "Rich Text"
+    }
+
+    init(note: Note) {
+        self.note = note
+        _attributedText = State(initialValue: note.attributedContent)
+        _noteTitle = State(initialValue: note.title)
+        _noteTags = State(initialValue: note.tags)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack {
-                Text(note.smartTitle)
+                TextField("Note title (optional)", text: $noteTitle)
+                    .textFieldStyle(.plain)
                     .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(CustomColors.contentPrimary)
+                    .foregroundColor(.primary)
 
                 Spacer()
 
                 Button("Done") {
-                    dismiss()
+                    saveAndDismiss()
                 }
                 .buttonStyle(.plain)
                 .foregroundColor(CustomColors.actionPrimary)
-                .font(.system(size: 14))
+                .font(.system(size: 14, weight: .medium))
             }
-            .padding(20)
-            .background(CustomColors.surfaceSecondary)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .background(CustomColors.surfaceBase)
 
             Divider()
-                .foregroundColor(Color(red: 230/255, green: 227/255, blue: 220/255))
 
-            // Content
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    // Metadata
-                    HStack {
-                        Label("Created: \(note.createdAt.formatted(date: .long, time: .shortened))", systemImage: "calendar")
-                            .font(.system(size: 12))
-                            .foregroundColor(CustomColors.contentSecondary)
-                        Spacer()
-                        Label("Updated: \(note.updatedAt.formatted(date: .long, time: .shortened))", systemImage: "clock")
-                            .font(.system(size: 12))
-                            .foregroundColor(CustomColors.contentSecondary)
+            // Formatting toolbar
+            formattingToolbarView
+
+            Divider()
+
+            // Rich text editor
+            RichTextEditor(
+                attributedText: $attributedText,
+                selectedRange: $selectedRange,
+                placeholder: "Edit your note...",
+                font: .systemFont(ofSize: 14),
+                onTextChange: { _ in },
+                onSelectionChange: { newRange in
+                    selectedRange = newRange
+                }
+            )
+            .background(
+                RichTextViewExtractor(textView: $textView)
+            )
+            .background(CustomColors.surfaceBase)
+
+            Divider()
+
+            // Action bar
+            actionBarView
+        }
+        .frame(width: 700, height: 800)
+        .onAppear {
+            // Load preferred copy format
+            switch appPreferences.preferredCopyFormat {
+            case "markdown": preferredCopyFormat = .markdown
+            case "plainText": preferredCopyFormat = .plainText
+            case "richText": preferredCopyFormat = .richText
+            default: preferredCopyFormat = .markdown
+            }
+        }
+    }
+
+    private var formattingToolbarView: some View {
+        HStack(alignment: .center, spacing: 0) {
+            // Left side: Formatting toolbar controls
+            if showFormattingToolbar {
+                HStack(spacing: 0) {
+                    Button(action: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showFormattingToolbar = false
+                        }
+                    }) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                            .frame(width: 28, height: 28)
                     }
+                    .buttonStyle(.plain)
+                    .help("Hide Formatting Toolbar")
+                    .padding(.leading, 16)
 
-                    Divider()
-                        .foregroundColor(Color(red: 230/255, green: 227/255, blue: 220/255))
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 0) {
+                            toolbarSection {
+                                formatButton(icon: "bold") { handleFormattingAction(.bold) }
+                                formatButton(icon: "italic") { handleFormattingAction(.italic) }
+                                formatButton(icon: "underline") { handleFormattingAction(.underline) }
+                            }
 
-                    // Tags
-                    if !note.tags.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Tags")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(CustomColors.contentPrimary)
+                            Divider().frame(height: 20).padding(.horizontal, 8)
+
+                            toolbarSection {
+                                formatButton(text: "H1") { handleFormattingAction(.heading1) }
+                                formatButton(text: "H2") { handleFormattingAction(.heading2) }
+                                formatButton(text: "H3") { handleFormattingAction(.heading3) }
+                            }
+
+                            Divider().frame(height: 20).padding(.horizontal, 8)
+
+                            toolbarSection {
+                                formatButton(icon: "list.bullet") { handleFormattingAction(.bulletList) }
+                                formatButton(icon: "list.number") { handleFormattingAction(.numberedList) }
+                                formatButton(icon: "checklist") { handleFormattingAction(.checkbox) }
+                            }
+
+                            Divider().frame(height: 20).padding(.horizontal, 8)
+
+                            toolbarSection {
+                                formatButton(icon: "increase.indent") { handleFormattingAction(.indent) }
+                                formatButton(icon: "decrease.indent") { handleFormattingAction(.outdent) }
+                            }
+
+                            Divider().frame(height: 20).padding(.horizontal, 8)
+
+                            toolbarSection {
+                                formatButton(icon: "link") { handleFormattingAction(.link) }
+                                formatButton(icon: "minus") { handleFormattingAction(.horizontalRule) }
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                    }
+                }
+            } else {
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        showFormattingToolbar = true
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Text("Aa")
+                            .font(.system(size: 13, weight: .semibold))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 9))
+                    }
+                    .foregroundColor(CustomColors.actionPrimary)
+                }
+                .buttonStyle(.plain)
+                .help("Show Formatting Toolbar")
+                .padding(.leading, 16)
+            }
+
+            Spacer()
+
+            // Right side: Copy button
+            Menu {
+                Menu("Preferred Format") {
+                    ForEach(CopyFormat.allCases, id: \.self) { format in
+                        Button(action: {
+                            preferredCopyFormat = format
+                            appPreferences.preferredCopyFormat = format.rawValue.lowercased().replacingOccurrences(of: " ", with: "")
+                        }) {
                             HStack {
-                                ForEach(note.tags, id: \.self) { tag in
-                                    Text(tag)
-                                        .font(.system(size: 11))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(CustomColors.actionPrimary.opacity(0.2))
-                                        .cornerRadius(4)
+                                Text(format.rawValue)
+                                if preferredCopyFormat == format {
+                                    Image(systemName: "checkmark")
                                 }
                             }
                         }
                     }
-
-                    // Content
-                    Text(note.content)
-                        .font(.system(size: 14))
-                        .foregroundColor(CustomColors.contentPrimary)
-                        .textSelection(.enabled)
                 }
-                .padding(20)
+
+                Divider()
+
+                Button("Copy as Markdown") {
+                    copyContent(as: .markdown)
+                }
+                Button("Copy as Plain Text") {
+                    copyContent(as: .plainText)
+                }
+                Button("Copy as Rich Text") {
+                    copyContent(as: .richText)
+                }
+            } label: {
+                HStack(spacing: 2) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 14))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8))
+                }
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+            } primaryAction: {
+                copyContent(as: preferredCopyFormat)
             }
-            .background(CustomColors.surfaceBase)
+            .fixedSize()
+            .menuStyle(.borderlessButton)
+            .buttonStyle(.plain)
+            .help("Copy (\(preferredCopyFormat.rawValue))")
+            .padding(.trailing, 16)
         }
+        .frame(height: 44)
         .background(CustomColors.surfaceBase)
-        .frame(width: 600, height: 700)
+    }
+
+    private var actionBarView: some View {
+        HStack(spacing: 12) {
+            // Character count
+            Text("\(attributedText.string.count) chars")
+                .font(.caption)
+                .foregroundColor(CustomColors.contentTertiary)
+
+            // Metadata
+            Text("Created: \(note.createdAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption)
+                .foregroundColor(CustomColors.contentTertiary)
+
+            Text("Updated: \(note.updatedAt.formatted(date: .abbreviated, time: .shortened))")
+                .font(.caption)
+                .foregroundColor(CustomColors.contentTertiary)
+
+            Spacer()
+
+            // Tags
+            if !noteTags.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(noteTags, id: \.self) { tag in
+                        HStack(spacing: 2) {
+                            Text(tag)
+                                .font(.caption2)
+                                .foregroundColor(CustomColors.contentPrimary)
+                            Button(action: {
+                                noteTags.removeAll { $0 == tag }
+                            }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(CustomColors.actionPrimary.opacity(0.2))
+                        .cornerRadius(4)
+                    }
+                }
+            }
+
+            // Tag input
+            HStack(spacing: 4) {
+                Image(systemName: "tag")
+                    .font(.caption2)
+                    .foregroundColor(CustomColors.contentSecondary)
+                TextField("Tag", text: $newTag)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .frame(width: 60)
+                    .onSubmit {
+                        addTag()
+                    }
+            }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+            .cornerRadius(4)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(CustomColors.surfaceHighlight)
+    }
+
+    // Helper view to extract NSTextView reference
+    private struct RichTextViewExtractor: NSViewRepresentable {
+        @Binding var textView: NSTextView?
+
+        func makeNSView(context: Context) -> NSView {
+            let view = NSView()
+            DispatchQueue.main.async {
+                self.attemptToFindTextView(from: view)
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                if self.textView == nil {
+                    self.attemptToFindTextView(from: view)
+                }
+            }
+            return view
+        }
+
+        func updateNSView(_ nsView: NSView, context: Context) {}
+
+        private func attemptToFindTextView(from view: NSView) {
+            var currentView: NSView? = view.superview
+            var depth = 0
+            let maxDepth = 20
+
+            while currentView != nil && depth < maxDepth {
+                if let scrollView = currentView as? NSScrollView,
+                   let foundTextView = scrollView.documentView as? NSTextView {
+                    self.textView = foundTextView
+                    return
+                }
+                currentView = currentView?.superview
+                depth += 1
+            }
+
+            if let window = view.window {
+                findTextViewInView(window.contentView)
+            }
+        }
+
+        private func findTextViewInView(_ view: NSView?) {
+            guard let view = view else { return }
+
+            if let scrollView = view as? NSScrollView,
+               let foundTextView = scrollView.documentView as? NSTextView {
+                self.textView = foundTextView
+                return
+            }
+
+            for subview in view.subviews {
+                findTextViewInView(subview)
+                if textView != nil { return }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func toolbarSection<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(spacing: 4) {
+            content()
+        }
+    }
+
+    private func formatButton(icon: String? = nil, text: String? = nil, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Group {
+                if let icon = icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 13))
+                } else if let text = text {
+                    Text(text)
+                        .font(.system(size: 11, weight: .medium))
+                }
+            }
+            .foregroundColor(.secondary)
+            .frame(width: 28, height: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func handleFormattingAction(_ action: FormattingAction) {
+        guard let textView = textView else { return }
+        let handler = RichTextFormattingHandler(textView: textView)
+        handler.handle(action)
+    }
+
+    private func copyContent(as format: CopyFormat) {
+        guard !attributedText.string.isEmpty else { return }
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+
+        switch format {
+        case .markdown:
+            let markdown = NSAttributedStringMarkdownConverter.convertToMarkdown(attributedText)
+            pasteboard.setString(markdown, forType: .string)
+        case .plainText:
+            pasteboard.setString(attributedText.string, forType: .string)
+        case .richText:
+            pasteboard.setString(attributedText.string, forType: .string)
+            if let rtfData = try? attributedText.data(
+                from: NSRange(location: 0, length: attributedText.length),
+                documentAttributes: [.documentType: NSAttributedString.DocumentType.rtf]
+            ) {
+                pasteboard.setData(rtfData, forType: .rtf)
+            }
+        }
+    }
+
+    private func addTag() {
+        let trimmedTag = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTag.isEmpty else { return }
+        guard !noteTags.contains(trimmedTag) else {
+            newTag = ""
+            return
+        }
+        noteTags.append(trimmedTag)
+        newTag = ""
+    }
+
+    private func saveAndDismiss() {
+        // Convert attributed string to markdown
+        var markdown = NSAttributedStringMarkdownConverter.convertToMarkdown(attributedText)
+
+        // Prepend title as heading if provided and not already in content
+        if !noteTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            markdown = "# \(noteTitle.trimmingCharacters(in: .whitespacesAndNewlines))\n\n\(markdown)"
+        }
+
+        // Create updated note
+        var updatedNote = note
+        updatedNote.title = noteTitle
+        updatedNote.content = markdown
+        updatedNote.tags = noteTags
+        updatedNote.updatedAt = Date()
+
+        // Update the note
+        noteManager.updateNote(updatedNote)
+
+        dismiss()
     }
 }

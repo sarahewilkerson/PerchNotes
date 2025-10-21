@@ -21,7 +21,6 @@ struct PerchNotesView: View {
     @State private var currentSize: MenuBarManager.PopoverSize = .default
     @State private var showFormattingToolbar = false
     @State private var showRecentNotes = false
-    @State private var preferredCopyFormat: CopyFormat = .markdown
     @State private var noteTitle: String = ""
     @FocusState private var isTextFieldFocused: Bool
     @FocusState private var isTitleFocused: Bool
@@ -31,6 +30,8 @@ struct PerchNotesView: View {
         case plainText = "Plain Text"
         case richText = "Rich Text"
     }
+
+    @State private var preferredCopyFormat: CopyFormat = .markdown
 
     private let placeholderText = """
     Quick capture...
@@ -75,6 +76,21 @@ struct PerchNotesView: View {
             }
             // Set current size to match the preferred size
             currentSize = appPreferences.popoverSizeEnum
+            // Load preferred copy format
+            switch appPreferences.preferredCopyFormat {
+            case "markdown": preferredCopyFormat = .markdown
+            case "plainText": preferredCopyFormat = .plainText
+            case "richText": preferredCopyFormat = .richText
+            default: preferredCopyFormat = .markdown
+            }
+        }
+        .onChange(of: preferredCopyFormat) { newFormat in
+            // Sync to AppPreferences for persistence and auto-completion detection
+            switch newFormat {
+            case .markdown: appPreferences.preferredCopyFormat = "markdown"
+            case .plainText: appPreferences.preferredCopyFormat = "plainText"
+            case .richText: appPreferences.preferredCopyFormat = "richText"
+            }
         }
         .background {
             // Hidden keyboard shortcut handlers

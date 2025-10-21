@@ -3,10 +3,18 @@ import SwiftUI
 /// Interactive onboarding walkthrough inspired by Things3
 struct OnboardingWalkthroughView: View {
     @Environment(\.dismiss) var dismiss
+    @ObservedObject var menuBarManager = MenuBarManager.shared
+    @ObservedObject var noteManager = NoteManager.shared
+    @ObservedObject var appPreferences = AppPreferences.shared
+
     @State private var expandedStep: Int? = 1  // Start with first step expanded
     @State private var completedSteps: Set<Int> = []
+    @State private var initialNoteCount = 0
+    @State private var hasOpenedLibrary = false
 
     var onComplete: (() -> Void)?
+
+    private let totalSteps = 9
 
     var body: some View {
         ZStack {
@@ -80,7 +88,7 @@ struct OnboardingWalkthroughView: View {
                         WalkthroughStep(
                             stepNumber: 5,
                             title: "Resize for your workflow",
-                            description: "Use the size selector in the top right corner to adjust the notepad size between Compact, Default, Expanded, or Large.",
+                            description: "Use the size selector in the top right corner to adjust the notepad size between Compact, Default, Expanded, or Large.\n\n*Tip: Try Large size for a full-height side-by-side workspace!*",
                             isCompleted: completedSteps.contains(5),
                             isExpanded: expandedStep == 5,
                             onToggle: { toggleStep(5) },
@@ -89,8 +97,8 @@ struct OnboardingWalkthroughView: View {
 
                         WalkthroughStep(
                             stepNumber: 6,
-                            title: "Save and organize in the library",
-                            description: "Your notes autosave as you work, but when you finish a note, click **Save Note** to save it to your library and clear your notepad for fresh starts.\n\nOpen the library to organize with folders, tags, and categories.\n\n*Tip: This is a good time to try unpinning if you don't want the notepad and library to overlap!*",
+                            title: "Detach and move the notepad",
+                            description: "Click the **location icon** next to the pin to detach the notepad from the menu bar. Once detached, you can move it anywhere on your screen!\n\n*Tip: Your position is remembered, so it'll reopen right where you left it.*",
                             isCompleted: completedSteps.contains(6),
                             isExpanded: expandedStep == 6,
                             onToggle: { toggleStep(6) },
@@ -99,19 +107,39 @@ struct OnboardingWalkthroughView: View {
 
                         WalkthroughStep(
                             stepNumber: 7,
-                            title: "Customize your experience",
-                            description: "In the Library view, find **Preferences** at the bottom of the sidebar to:\n• Hide the dock icon for menu-bar-only mode\n• Access this walkthrough anytime.",
+                            title: "Save and organize in the library",
+                            description: "Your notes autosave as you work, but when you finish a note, click **Save Note** to save it to your library and clear your notepad for fresh starts.\n\nOpen the library to organize with folders, tags, and categories.",
                             isCompleted: completedSteps.contains(7),
                             isExpanded: expandedStep == 7,
                             onToggle: { toggleStep(7) },
                             onComplete: { completeStep(7) }
+                        )
+
+                        WalkthroughStep(
+                            stepNumber: 8,
+                            title: "Trash and recovery",
+                            description: "Deleted notes move to **Trash** instead of being permanently deleted. They auto-delete after 30 days, but you can restore them anytime before then.\n\nFind Trash in the Library sidebar under the System section.",
+                            isCompleted: completedSteps.contains(8),
+                            isExpanded: expandedStep == 8,
+                            onToggle: { toggleStep(8) },
+                            onComplete: { completeStep(8) }
+                        )
+
+                        WalkthroughStep(
+                            stepNumber: 9,
+                            title: "Customize your experience",
+                            description: "In the Library view, find **Preferences** at the bottom of the sidebar to:\n• Hide the dock icon for menu-bar-only mode\n• Set your preferred notepad size\n• Access this walkthrough anytime.",
+                            isCompleted: completedSteps.contains(9),
+                            isExpanded: expandedStep == 9,
+                            onToggle: { toggleStep(9) },
+                            onComplete: { completeStep(9) }
                         )
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
 
                     // Completion message
-                    if completedSteps.count == 7 {
+                    if completedSteps.count == totalSteps {
                         VStack(spacing: 16) {
                             Image(systemName: "checkmark.circle.fill")
                                 .font(.system(size: 48))
@@ -148,6 +176,46 @@ struct OnboardingWalkthroughView: View {
             }
         }
         .frame(width: 580, height: 720)
+        .onAppear {
+            initialNoteCount = noteManager.activeNotes.count
+        }
+        // Auto-completion observers
+        .onChange(of: menuBarManager.isPopoverVisible) { newValue in
+            // Step 1: Try the quick notepad
+            if newValue && !completedSteps.contains(1) {
+                completeStep(1)
+            }
+        }
+        .onChange(of: menuBarManager.floatOnTop) { newValue in
+            // Step 2: Pin or Unpin - complete if they unpin
+            if !newValue && !completedSteps.contains(2) {
+                completeStep(2)
+            }
+        }
+        .onChange(of: appPreferences.preferredCopyFormat) { _ in
+            // Step 4: Set one-click copy preferences
+            if !completedSteps.contains(4) {
+                completeStep(4)
+            }
+        }
+        .onChange(of: menuBarManager.popoverSize) { _ in
+            // Step 5: Resize for your workflow
+            if !completedSteps.contains(5) {
+                completeStep(5)
+            }
+        }
+        .onChange(of: menuBarManager.isDetached) { newValue in
+            // Step 6: Detach and move the notepad
+            if newValue && !completedSteps.contains(6) {
+                completeStep(6)
+            }
+        }
+        .onChange(of: noteManager.activeNotes.count) { newValue in
+            // Step 7: Save and organize - detect when a new note is saved
+            if newValue > initialNoteCount && !completedSteps.contains(7) {
+                completeStep(7)
+            }
+        }
     }
 
     private func toggleStep(_ step: Int) {
@@ -166,7 +234,7 @@ struct OnboardingWalkthroughView: View {
         }
 
         // Auto-expand the next step after a brief delay
-        if step < 7 {
+        if step < totalSteps {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 withAnimation(.easeInOut(duration: 0.2)) {
                     expandedStep = step + 1

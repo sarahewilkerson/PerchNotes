@@ -18,10 +18,17 @@ class AppPreferences: ObservableObject {
         }
     }
 
+    @Published var preferredCopyFormat: String {
+        didSet {
+            UserDefaults.standard.set(preferredCopyFormat, forKey: "preferredCopyFormat")
+        }
+    }
+
     private init() {
         // Load saved preferences
         self.hideDockIcon = UserDefaults.standard.bool(forKey: "hideDockIcon")
         self.preferredPopoverSize = UserDefaults.standard.string(forKey: "preferredPopoverSize") ?? "default"
+        self.preferredCopyFormat = UserDefaults.standard.string(forKey: "preferredCopyFormat") ?? "markdown"
 
         // Apply the preference on launch
         DispatchQueue.main.async {
