@@ -22,6 +22,9 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
 
         // Observe menu bar popover visibility
         setupPopoverObserver()
+
+        // Observe Library window opening
+        setupLibraryObserver()
     }
 
     private func setupOnboardingObserver() {
@@ -52,12 +55,29 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
     }
 
     @MainActor
+    private func setupLibraryObserver() {
+        MenuBarManager.shared.$isLibraryOpen
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isOpen in
+                if isOpen {
+                    Task { @MainActor in
+                        self?.handleLibraryOpened()
+                    }
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    @MainActor
     func showOnboardingWindow() {
         if let window = onboardingWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
+
+        // Create sample note if needed (so user has something to interact with)
+        OnboardingManager.shared.createSampleNoteIfNeeded()
 
         let onboardingView = OnboardingWalkthroughView(
             onComplete: { [weak self] in
@@ -164,6 +184,42 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(newFrame, display: true)
         })
+    }
+
+    @MainActor
+    private func handleLibraryOpened() {
+        guard let window = onboardingWindow else { return }
+        guard let screen = NSScreen.main else { return }
+
+        // Close the notepad
+        if MenuBarManager.shared.isDetached {
+            // Close detached window
+            MenuBarManager.shared.hideDetachedWindow()
+        } else if MenuBarManager.shared.isPopoverVisible {
+            // Close popover
+            MenuBarManager.shared.hidePopover()
+        }
+
+        // Move onboarding to the right side
+        let screenFrame = screen.visibleFrame
+        let windowWidth: CGFloat = 580
+        let windowHeight: CGFloat = 720
+
+        // Position on the right side of the screen
+        let xPos = screenFrame.maxX - windowWidth - 20
+        let yPos = screenFrame.origin.y + (screenFrame.height - windowHeight) / 2
+
+        let newFrame = NSRect(x: xPos, y: yPos, width: windowWidth, height: windowHeight)
+
+        // Animate the move
+        NSAnimationContext.runAnimationGroup({ context in
+            context.duration = 0.4
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            window.animator().setFrame(newFrame, display: true)
+        })
+
+        // Make sure onboarding stays on top
+        window.level = .floating
     }
 }
 

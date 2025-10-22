@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Carbon
 
 @MainActor
 class MenuBarManager: NSObject, ObservableObject {
@@ -16,6 +17,8 @@ class MenuBarManager: NSObject, ObservableObject {
     @Published var popoverSize: PopoverSize = .default
     @Published var floatOnTop = false
     @Published var isFormattingToolbarVisible = false
+    @Published var didCopyContent = false
+    @Published var isLibraryOpen = false
 
     private let detachedWindowFrameKey = "detachedWindowFrame"
 
@@ -57,6 +60,43 @@ class MenuBarManager: NSObject, ObservableObject {
 
     override init() {
         super.init()
+        setupGlobalShortcut()
+    }
+
+    private func setupGlobalShortcut() {
+        // Hotkey 1: Cmd+Shift+P - Toggle notepad
+        let toggleHotKeyID = EventHotKeyID(signature: OSType(0x50524348), id: 1) // 'PRCH'
+        var toggleHotKeyRef: EventHotKeyRef?
+        let toggleKeyCode: UInt32 = 35 // P key
+        let toggleModifiers: UInt32 = UInt32(cmdKey | shiftKey)
+        RegisterEventHotKey(toggleKeyCode, toggleModifiers, toggleHotKeyID, GetApplicationEventTarget(), 0, &toggleHotKeyRef)
+
+        // Hotkey 2: Cmd+Ctrl+Shift+P - Pin/Unpin
+        let pinHotKeyID = EventHotKeyID(signature: OSType(0x50524348), id: 2) // 'PRCH'
+        var pinHotKeyRef: EventHotKeyRef?
+        let pinKeyCode: UInt32 = 35 // P key
+        let pinModifiers: UInt32 = UInt32(cmdKey | controlKey | shiftKey)
+        RegisterEventHotKey(pinKeyCode, pinModifiers, pinHotKeyID, GetApplicationEventTarget(), 0, &pinHotKeyRef)
+
+        // Set up event handler for both hotkeys
+        var eventHandler: EventHandlerRef?
+        var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: OSType(kEventHotKeyPressed))
+
+        InstallEventHandler(GetApplicationEventTarget(), { (nextHandler, theEvent, userData) -> OSStatus in
+            var hotKeyID = EventHotKeyID()
+            GetEventParameter(theEvent, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID), nil, MemoryLayout<EventHotKeyID>.size, nil, &hotKeyID)
+
+            Task { @MainActor in
+                if hotKeyID.id == 1 {
+                    // Cmd+Shift+P - Toggle notepad
+                    MenuBarManager.shared.togglePopover()
+                } else if hotKeyID.id == 2 {
+                    // Cmd+Ctrl+Shift+P - Pin/Unpin
+                    MenuBarManager.shared.setFloatOnTop(!MenuBarManager.shared.floatOnTop)
+                }
+            }
+            return noErr
+        }, 1, &eventType, nil, &eventHandler)
     }
 
     func enableMenuBar() {
@@ -78,7 +118,7 @@ class MenuBarManager: NSObject, ObservableObject {
             button.action = #selector(statusBarButtonClicked)
             button.target = self
 
-            button.toolTip = "PerchNotes - Quick Notes"
+            button.toolTip = "PerchNotes - Quick Notes\n⌘⇧P to toggle | ⌘⌃⇧P to pin/unpin"
         }
 
         // Create popover
@@ -138,7 +178,7 @@ class MenuBarManager: NSObject, ObservableObject {
         }
     }
 
-    private func hidePopover() {
+    func hidePopover() {
         popover?.close()
         isPopoverVisible = false
     }
@@ -214,10 +254,20 @@ class MenuBarManager: NSObject, ObservableObject {
     func togglePopover() {
         guard let button = statusBarItem?.button else { return }
 
-        if isPopoverVisible {
-            hidePopover()
+        if isDetached {
+            // Toggle detached window visibility
+            if let window = detachedWindow, window.isVisible {
+                hideDetachedWindow()
+            } else {
+                showDetachedWindow()
+            }
         } else {
-            showPopover(relativeTo: button)
+            // Toggle popover visibility
+            if isPopoverVisible {
+                hidePopover()
+            } else {
+                showPopover(relativeTo: button)
+            }
         }
     }
 
@@ -366,7 +416,7 @@ class MenuBarManager: NSObject, ObservableObject {
         }
     }
 
-    private func hideDetachedWindow() {
+    func hideDetachedWindow() {
         saveDetachedWindowFrame()
         detachedWindow?.orderOut(nil)
         isPopoverVisible = false
@@ -406,6 +456,7 @@ class MenuBarManager: NSObject, ObservableObject {
         if let window = libraryWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
+            isLibraryOpen = true
             return
         }
 
@@ -428,6 +479,17 @@ class MenuBarManager: NSObject, ObservableObject {
         }
 
         libraryWindow = window
+        isLibraryOpen = true
+
+        // Observe window close
+        NotificationCenter.default.addObserver(
+            forName: NSWindow.willCloseNotification,
+            object: window,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isLibraryOpen = false
+        }
+
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
@@ -435,6 +497,7 @@ class MenuBarManager: NSObject, ObservableObject {
     func closeLibraryWindow() {
         libraryWindow?.close()
         libraryWindow = nil
+        isLibraryOpen = false
     }
 }
 

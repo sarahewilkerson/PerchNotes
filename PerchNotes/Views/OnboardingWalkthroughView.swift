@@ -50,7 +50,7 @@ struct OnboardingWalkthroughView: View {
                             WalkthroughStep(
                                 stepNumber: 1,
                                 title: "Open your notepad",
-                                description: "PerchNotes lives in your menu bar—always there when you need it.\n\n**Try it:** Click the bird icon in your menu bar to open your notepad.",
+                                description: "PerchNotes lives in your menu bar—always there when you need it.\n\n**Try it:** Click the bird icon in your menu bar to open your notepad \n\n OR use shortcut **⌘ + Shift + P** to toggle your notepad open and close.",
                                 icon: "BirdIconGreen",
                                 iconIsAsset: true,
                                 isCompleted: completedSteps.contains(1),
@@ -63,7 +63,7 @@ struct OnboardingWalkthroughView: View {
                             WalkthroughStep(
                                 stepNumber: 2,
                                 title: "Pin it in place",
-                                description: "See the pin icon in the top right? It keeps PerchNotes floating above your other windows so you can reference notes while you work.\n\n**Try it:** Click the pin to unpin it. (We'll automatically re-pin it for the next step.)",
+                                description: "See the pin icon in the top right? It keeps PerchNotes floating above your other windows so you can reference notes while you work.\n\n**Try it:** Click the pin - or us shortcut **⌘ + CTRL + Shift + P** - to toggle pin/unpin.",
                                 icon: "pin.fill",
                                 isCompleted: completedSteps.contains(2),
                                 isExpanded: expandedStep == 2,
@@ -87,7 +87,7 @@ struct OnboardingWalkthroughView: View {
                             WalkthroughStep(
                                 stepNumber: 4,
                                 title: "Copy in your preferred format",
-                                description: "The copy button gives you three options:\n\n• **Markdown** – preserves formatting as markdown syntax\n• **Plain Text** – strips all formatting\n• **Rich Text** – keeps visual formatting for other apps\n\n**Try it:** Click the dropdown next to the copy icon to choose your default.",
+                                description: "The copy button gives you three options:\n\n• **Markdown** – preserves formatting as markdown syntax\n• **Plain Text** – strips all formatting\n• **Rich Text** – keeps visual formatting for other apps\n\n**Try it:** Highlight some text in your notepad, then click the copy icon (or use the dropdown to set your preferred format).",
                                 icon: "doc.on.doc",
                                 isCompleted: completedSteps.contains(4),
                                 isExpanded: expandedStep == 4,
@@ -122,8 +122,8 @@ struct OnboardingWalkthroughView: View {
 
                             WalkthroughStep(
                                 stepNumber: 7,
-                                title: "Save to your library",
-                                description: "Your notepad autosaves as you type. When you're done with a note, save it to your library where you can organize with folders, tags, and categories.\n\n**Try it:** Click **Save**, then open the **Library** to see your saved notes.",
+                                title: "Explore your library",
+                                description: "Your Library is where all your saved notes live. You can organize them with folders, tags, and categories.\n\nWe've added a sample note for you to explore.\n\n**Try it:** Click the **Library** button to see your notes.",
                                 icon: "square.grid.2x2",
                                 isCompleted: completedSteps.contains(7),
                                 isExpanded: expandedStep == 7,
@@ -135,7 +135,7 @@ struct OnboardingWalkthroughView: View {
                             WalkthroughStep(
                                 stepNumber: 8,
                                 title: "Notes go to trash first",
-                                description: "Deleted notes move to **Trash** where they stay for 30 days before auto-deleting. You can restore them anytime during that window.\n\nYou'll find Trash in the Library sidebar under System.\n\n**Try it:** Click **Got it!** when you're ready to continue.",
+                                description: "Deleted notes move to **Trash** where they stay for 30 days before auto-deleting. You can restore them anytime during that window.\n\nYou'll find Trash in the Library sidebar under System.\n\n**Try it:** Click the trash icon on one of your sample notes to see how it works.",
                                 icon: "trash",
                                 isCompleted: completedSteps.contains(8),
                                 isExpanded: expandedStep == 8,
@@ -201,7 +201,7 @@ struct OnboardingWalkthroughView: View {
                         .transition(.opacity.combined(with: .scale))
                     }
                 }
-                .padding(.bottom, 100)
+                .padding(.bottom, 300)
                 }
                 .onChange(of: scrollToStep) { step in
                     print("🔴 onChange triggered, scrollToStep: \(step ?? -1)")
@@ -211,7 +211,7 @@ struct OnboardingWalkthroughView: View {
 
                     // Smooth, visible scroll animation
                     // Use .center for better visibility, especially for later steps
-                    withAnimation(.easeInOut(duration: 0.5)) {
+                    withAnimation(.easeIn(duration: 0.65)) {
                         proxy.scrollTo("step-\(step)", anchor: .center)
                     }
 
@@ -227,6 +227,13 @@ struct OnboardingWalkthroughView: View {
         .frame(width: 580, height: 720)
         .onAppear {
             initialNoteCount = noteManager.activeNotes.count
+
+            // Load the Welcome note into the notepad for copy demo
+            if let welcomeNote = noteManager.activeNotes.first(where: { $0.title == "Welcome to PerchNotes" }) {
+                // Load note content into notepad
+                noteManager.draftContent = welcomeNote.content
+            }
+
             // Scroll to first step on appear
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 scrollToStep = 1
@@ -261,6 +268,12 @@ struct OnboardingWalkthroughView: View {
                 completeStep(4)
             }
         }
+        .onChange(of: menuBarManager.didCopyContent) { didCopy in
+            // Step 4: Also complete when content is copied
+            if didCopy && !completedSteps.contains(4) {
+                completeStep(4)
+            }
+        }
         .onChange(of: menuBarManager.popoverSize) { _ in
             // Step 5: Resize for your workflow
             if !completedSteps.contains(5) {
@@ -273,56 +286,57 @@ struct OnboardingWalkthroughView: View {
                 completeStep(6)
             }
         }
-        .onChange(of: noteManager.activeNotes.count) { newValue in
-            // Step 7: Save and organize - detect when a new note is saved
-            if newValue > initialNoteCount && !completedSteps.contains(7) {
+        .onChange(of: menuBarManager.isLibraryOpen) { isOpen in
+            // Step 7: Explore your library - complete when they open the library
+            if isOpen && !completedSteps.contains(7) {
                 completeStep(7)
+            }
+        }
+        .onChange(of: noteManager.trashedNotes.count) { newCount in
+            // Step 8: Trash a note - complete when they trash a note
+            if newCount > 0 && !completedSteps.contains(8) {
+                completeStep(8)
             }
         }
     }
 
     private func toggleStep(_ step: Int) {
         print("🔵 toggleStep called for step \(step), expandedStep: \(expandedStep ?? -1)")
-        if expandedStep == step {
-            // Collapse current step
-            withAnimation(.easeInOut(duration: 0.25)) {
+        withAnimation(.easeIn(duration: 0.35)) {
+            if expandedStep == step {
+                // Collapse current step
                 expandedStep = nil
-            }
-        } else {
-            // Step 1: Scroll FIRST (while old step is still visible)
-            print("🟢 Setting scrollToStep to \(step)")
-            scrollToStep = step
-
-            // Step 2: After scroll completes, swap steps
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    expandedStep = step
-                }
+            } else {
+                // Expand this step
+                expandedStep = step
             }
         }
     }
 
     private func completeStep(_ step: Int) {
         print("⭐ completeStep called for step \(step)")
-
+        
         // Mark as completed
         completedSteps.insert(step)
-
+        
         // Move to next step if not at end
-        if step < totalSteps {
+        if step <= (totalSteps) {
             // Step 1: Scroll to next step FIRST (current step still visible)
             print("🟢 completeStep setting scrollToStep to \(step + 1)")
             scrollToStep = step + 1
-
+            
             // Step 2: After scroll, close current and expand next
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                withAnimation(.easeInOut(duration: 0.25)) {
+                withAnimation(.easeIn(duration: 0.35)) {
                     expandedStep = step + 1
                 }
             }
-        } else {
+        }
+       
+        else
+        {
             // Last step completed, close it
-            withAnimation(.easeInOut(duration: 0.25)) {
+            withAnimation(.easeIn(duration: 0.35)) {
                 expandedStep = nil
             }
         }
@@ -406,12 +420,10 @@ struct WalkthroughStep: View {
 
                         Spacer()
 
-                        // Info icon
-                        if !isCompleted {
-                            Image(systemName: isExpanded ? "chevron.down" : "info.circle")
-                                .font(.system(size: 14))
-                                .foregroundColor(CustomColors.actionPrimary.opacity(0.7))
-                        }
+                        // Info icon (always show so users can revisit completed steps)
+                        Image(systemName: isExpanded ? "chevron.down" : "info.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(CustomColors.actionPrimary.opacity(0.7))
                     }
                 }
                 .buttonStyle(.plain)
@@ -421,8 +433,8 @@ struct WalkthroughStep: View {
             .cornerRadius(10)
             .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
 
-            // Expanded description
-            if isExpanded && !isCompleted {
+            // Expanded description (allow viewing completed steps too)
+            if isExpanded {
                 VStack(alignment: .leading, spacing: 16) {
                     // Parse description into main text and "Try it" section
                     let components = parseDescription(description)
@@ -439,6 +451,20 @@ struct WalkthroughStep: View {
                     // "Try it" call-to-action box
                     if let tryItText = components.tryIt {
                         VStack(alignment: .center, spacing: 12) {
+                            // Icon
+                            if iconIsAsset {
+                                if let nsImage = NSImage(named: icon) {
+                                    Image(nsImage: nsImage)
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                        .frame(width: 32, height: 32)
+                                }
+                            } else {
+                                Image(systemName: icon)
+                                    .font(.system(size: 28))
+                                    .foregroundColor(CustomColors.actionPrimary)
+                            }
+
                             Text("TRY IT")
                                 .font(.system(size: 11, weight: .bold))
                                 .foregroundColor(CustomColors.actionPrimary)
@@ -450,18 +476,6 @@ struct WalkthroughStep: View {
                                 .lineSpacing(3)
                                 .multilineTextAlignment(.center)
                                 .fixedSize(horizontal: false, vertical: true)
-
-                            Button(action: onComplete) {
-                                Text("GOT IT")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .tracking(0.5)
-                                    .padding(.horizontal, 24)
-                                    .padding(.vertical, 10)
-                                    .background(CustomColors.actionPrimary)
-                                    .cornerRadius(8)
-                            }
-                            .buttonStyle(.plain)
                         }
                         .frame(maxWidth: .infinity)
                         .padding(16)
@@ -471,18 +485,6 @@ struct WalkthroughStep: View {
                             RoundedRectangle(cornerRadius: 8)
                                 .stroke(CustomColors.actionPrimary.opacity(0.2), lineWidth: 1)
                         )
-                    } else {
-                        // No "Try it" section, show regular button
-                        Button(action: onComplete) {
-                            Text("Got it!")
-                                .font(.system(size: 13, weight: .medium))
-                                .foregroundColor(CustomColors.actionPrimary)
-                                .padding(.horizontal, 16)
-                                .padding(.vertical, 6)
-                                .background(CustomColors.actionPrimary.opacity(0.1))
-                                .cornerRadius(6)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(16)

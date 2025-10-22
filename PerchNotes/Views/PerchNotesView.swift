@@ -181,8 +181,10 @@ struct PerchNotesView: View {
                         .foregroundColor(CustomColors.actionPrimary)
                 }
 
-                // Folder dropdown (folder/category selector)
-                folderPickerMenu
+                // Folder dropdown (only show if folders or categories exist)
+                if !noteManager.folders.isEmpty || !noteManager.categories.isEmpty {
+                    folderPickerMenu
+                }
             }
 
             Spacer()
@@ -777,119 +779,246 @@ struct PerchNotesView: View {
     }
 
     private var actionBarView: some View {
-        HStack {
-            // Character count
-            Text("\(attributedDraft.string.count) chars")
-                .font(.caption)
-                .foregroundColor(CustomColors.contentTertiary)
+        Group {
+            if currentSize == .compact {
+                // Compact layout: Stack into two rows
+                VStack(spacing: 8) {
+                    // Row 1: Character count + buttons
+                    HStack {
+                        Text("\(attributedDraft.string.count) chars")
+                            .font(.caption)
+                            .foregroundColor(CustomColors.contentTertiary)
 
-            // Success feedback
-            if showingSuccessIndicator {
-                HStack(spacing: 4) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.caption)
-                        .foregroundColor(CustomColors.feedbackSuccess)
-                    Text(successMessage)
-                        .font(.caption)
-                        .foregroundColor(CustomColors.feedbackSuccess)
-                }
-                .transition(.opacity.combined(with: .scale))
-            }
-
-            Spacer()
-
-            // Tags display and input
-            if !noteTags.isEmpty {
-                HStack(spacing: 4) {
-                    ForEach(noteTags, id: \.self) { tag in
-                        HStack(spacing: 2) {
-                            Text(tag)
-                                .font(.caption2)
-                                .foregroundColor(CustomColors.contentPrimary)
-                            Button(action: {
-                                noteTags.removeAll { $0 == tag }
-                            }) {
-                                Image(systemName: "xmark.circle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(.secondary)
+                        // Success feedback
+                        if showingSuccessIndicator {
+                            HStack(spacing: 4) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption)
+                                    .foregroundColor(CustomColors.feedbackSuccess)
+                                Text(successMessage)
+                                    .font(.caption)
+                                    .foregroundColor(CustomColors.feedbackSuccess)
                             }
-                            .buttonStyle(.plain)
+                            .transition(.opacity.combined(with: .scale))
+                        }
+
+                        Spacer()
+
+                        Button("Clear") {
+                            attributedDraft = NSAttributedString(string: "")
+                            noteTitle = ""
+                            noteManager.clearDraft()
+                        }
+                        .font(.caption)
+                        .foregroundColor(CustomColors.contentSecondary)
+                        .buttonStyle(.plain)
+                        .disabled(attributedDraft.string.isEmpty && noteTitle.isEmpty)
+
+                        Button("Save") {
+                            saveNote()
+                        }
+                        .font(.caption)
+                        .fontWeight(.medium)
+                        .foregroundColor(CustomColors.actionPrimaryText)
+                        .disabled(attributedDraft.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(attributedDraft.string.isEmpty ? Color.gray : CustomColors.actionPrimary)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                        .buttonStyle(.plain)
+                        .keyboardShortcut(.return, modifiers: .command)
+                    }
+
+                    // Row 2: Tag + Title fields (more compact)
+                    HStack(spacing: 8) {
+                        // Tags display
+                        if !noteTags.isEmpty {
+                            HStack(spacing: 4) {
+                                ForEach(noteTags, id: \.self) { tag in
+                                    HStack(spacing: 2) {
+                                        Text(tag)
+                                            .font(.caption2)
+                                            .foregroundColor(CustomColors.contentPrimary)
+                                        Button(action: {
+                                            noteTags.removeAll { $0 == tag }
+                                        }) {
+                                            Image(systemName: "xmark.circle.fill")
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(CustomColors.actionPrimary.opacity(0.2))
+                                    .cornerRadius(4)
+                                }
+                            }
+                        }
+
+                        // Tag input field
+                        HStack(spacing: 4) {
+                            Image(systemName: "tag")
+                                .font(.caption2)
+                                .foregroundColor(CustomColors.contentSecondary)
+                            TextField("Tag", text: $newTag)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .frame(width: 50)
+                                .onSubmit {
+                                    addTag()
+                                }
                         }
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(CustomColors.actionPrimary.opacity(0.2))
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                        .cornerRadius(4)
+
+                        // Optional title field (flexible width)
+                        HStack(spacing: 4) {
+                            TextField("Title", text: $noteTitle)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .focused($isTitleFocused)
+                                .frame(minWidth: 60, maxWidth: .infinity)
+
+                            if !noteTitle.isEmpty {
+                                Button(action: {
+                                    noteTitle = ""
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
                         .cornerRadius(4)
                     }
                 }
-            }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(CustomColors.surfaceHighlight)
+            } else {
+                // Default layout: Single row for larger sizes
+                HStack {
+                    // Character count
+                    Text("\(attributedDraft.string.count) chars")
+                        .font(.caption)
+                        .foregroundColor(CustomColors.contentTertiary)
 
-            // Tag input field
-            HStack(spacing: 4) {
-                Image(systemName: "tag")
-                    .font(.caption2)
-                    .foregroundColor(CustomColors.contentSecondary)
-                TextField("Tag", text: $newTag)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13))
-                    .frame(width: 60)
-                    .onSubmit {
-                        addTag()
+                    // Success feedback
+                    if showingSuccessIndicator {
+                        HStack(spacing: 4) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(CustomColors.feedbackSuccess)
+                            Text(successMessage)
+                                .font(.caption)
+                                .foregroundColor(CustomColors.feedbackSuccess)
+                        }
+                        .transition(.opacity.combined(with: .scale))
                     }
-            }
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
-            .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-            .cornerRadius(4)
 
-            // Optional title field
-            TextField("Title (optional)", text: $noteTitle)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .focused($isTitleFocused)
-                .frame(width: 120)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-                .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
-                .cornerRadius(4)
+                    Spacer()
 
-            if !noteTitle.isEmpty {
-                Button(action: {
-                    noteTitle = ""
-                }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
+                    // Tags display and input
+                    if !noteTags.isEmpty {
+                        HStack(spacing: 4) {
+                            ForEach(noteTags, id: \.self) { tag in
+                                HStack(spacing: 2) {
+                                    Text(tag)
+                                        .font(.caption2)
+                                        .foregroundColor(CustomColors.contentPrimary)
+                                    Button(action: {
+                                        noteTags.removeAll { $0 == tag }
+                                    }) {
+                                        Image(systemName: "xmark.circle.fill")
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(CustomColors.actionPrimary.opacity(0.2))
+                                .cornerRadius(4)
+                            }
+                        }
+                    }
+
+                    // Tag input field
+                    HStack(spacing: 4) {
+                        Image(systemName: "tag")
+                            .font(.caption2)
+                            .foregroundColor(CustomColors.contentSecondary)
+                        TextField("Tag", text: $newTag)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 13))
+                            .frame(width: 60)
+                            .onSubmit {
+                                addTag()
+                            }
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                    .cornerRadius(4)
+
+                    // Optional title field
+                    TextField("Title (optional)", text: $noteTitle)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .focused($isTitleFocused)
+                        .frame(width: 120)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+                        .cornerRadius(4)
+
+                    if !noteTitle.isEmpty {
+                        Button(action: {
+                            noteTitle = ""
+                        }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    Button("Clear") {
+                        attributedDraft = NSAttributedString(string: "")
+                        noteTitle = ""
+                        noteManager.clearDraft()
+                    }
+                    .font(.caption)
+                    .foregroundColor(CustomColors.contentSecondary)
+                    .buttonStyle(.plain)
+                    .disabled(attributedDraft.string.isEmpty && noteTitle.isEmpty)
+
+                    Button("Save") {
+                        saveNote()
+                    }
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(CustomColors.actionPrimaryText)
+                    .disabled(attributedDraft.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(attributedDraft.string.isEmpty ? Color.gray : CustomColors.actionPrimary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .buttonStyle(.plain)
+                    .keyboardShortcut(.return, modifiers: .command)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .background(CustomColors.surfaceHighlight)
             }
-
-            Button("Clear") {
-                attributedDraft = NSAttributedString(string: "")
-                noteTitle = ""
-                noteManager.clearDraft()
-            }
-            .font(.caption)
-            .foregroundColor(CustomColors.contentSecondary)
-            .buttonStyle(.plain)
-            .disabled(attributedDraft.string.isEmpty && noteTitle.isEmpty)
-
-            Button("Save") {
-                saveNote()
-            }
-            .font(.caption)
-            .fontWeight(.medium)
-            .foregroundColor(CustomColors.actionPrimaryText)
-            .disabled(attributedDraft.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(attributedDraft.string.isEmpty ? Color.gray : CustomColors.actionPrimary)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .buttonStyle(.plain)
-            .keyboardShortcut(.return, modifiers: .command)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(CustomColors.surfaceHighlight)
     }
 
     private func handleFormattingAction(_ action: FormattingAction) {
@@ -946,6 +1075,9 @@ struct PerchNotesView: View {
                 pasteboard.setData(rtfData, forType: .rtf)
             }
         }
+
+        // Notify that content was copied (for onboarding)
+        menuBarManager.didCopyContent = true
     }
 
     private func addTag() {
