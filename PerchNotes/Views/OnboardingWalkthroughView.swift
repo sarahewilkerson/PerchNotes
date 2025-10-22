@@ -285,35 +285,18 @@ struct OnboardingWalkthroughView: View {
         print("🔵 toggleStep called for step \(step), expandedStep: \(expandedStep ?? -1)")
         if expandedStep == step {
             // Collapse current step
-            withAnimation(.easeInOut(duration: 0.3)) {
+            withAnimation(.easeInOut(duration: 0.25)) {
                 expandedStep = nil
             }
         } else {
-            // Step 1: Close current step
-            if expandedStep != nil {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    expandedStep = nil
-                }
-                // Step 2: Wait, then scroll
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    print("🟢 Setting scrollToStep to \(step)")
-                    scrollToStep = step
+            // Step 1: Scroll FIRST (while old step is still visible)
+            print("🟢 Setting scrollToStep to \(step)")
+            scrollToStep = step
 
-                    // Step 3: Wait for scroll, then expand
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            expandedStep = step
-                        }
-                    }
-                }
-            } else {
-                // No step open, just scroll then expand
-                print("🟢 Setting scrollToStep to \(step)")
-                scrollToStep = step
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        expandedStep = step
-                    }
+            // Step 2: After scroll completes, swap steps
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    expandedStep = step
                 }
             }
         }
@@ -327,21 +310,14 @@ struct OnboardingWalkthroughView: View {
 
         // Move to next step if not at end
         if step < totalSteps {
-            // Step 1: Close current step
-            withAnimation(.easeInOut(duration: 0.25)) {
-                expandedStep = nil
-            }
+            // Step 1: Scroll to next step FIRST (current step still visible)
+            print("🟢 completeStep setting scrollToStep to \(step + 1)")
+            scrollToStep = step + 1
 
-            // Step 2: Wait, then scroll to next
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                print("🟢 completeStep setting scrollToStep to \(step + 1)")
-                scrollToStep = step + 1
-
-                // Step 3: Wait for scroll, then expand next step
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        expandedStep = step + 1
-                    }
+            // Step 2: After scroll, close current and expand next
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    expandedStep = step + 1
                 }
             }
         } else {
