@@ -99,6 +99,7 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
         }
 
         onboardingWindow = window
+        window.delegate = self
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
 
@@ -163,6 +164,20 @@ class PerchNotesAppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             window.animator().setFrame(newFrame, display: true)
         })
+    }
+}
+
+// MARK: - NSWindowDelegate
+
+extension PerchNotesAppDelegate: NSWindowDelegate {
+    func windowWillClose(_ notification: Notification) {
+        // If onboarding window is closing, mark onboarding as complete
+        // This ensures it won't show again even if user closes without finishing
+        if notification.object as? NSWindow === onboardingWindow {
+            OnboardingManager.shared.markOnboardingComplete()
+            onboardingWindow = nil
+            hasAnimatedOnboarding = false
+        }
     }
 }
 
